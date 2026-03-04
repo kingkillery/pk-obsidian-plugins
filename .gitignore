@@ -3,3 +3,5 @@ plugins/**/.obsidian/
 /plugins/obsidian-execute-code/.obsidian/
 /plugins/obsidian-terminal/.obsidian/
 /plugins/tasknotes/tasknotes-e2e-vault/.obsidian/
+node_modules/
+**/data.json
