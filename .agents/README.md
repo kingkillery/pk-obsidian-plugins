@@ -1,0 +1,1 @@
+Restored placeholder .agents directory after workspace consolidation.

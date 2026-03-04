@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scp:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(gh pr create --base master --head dev --title \"Merge dev into master: albatross refresh, daily report, gap docs\" --body \"$\\(cat <<''EOF''\n## Summary\n- feat: albatross refresh CLI + column rename handling for 2026-02-10 export\n- feat: daily report compiler + 8:30 AM scheduler\n- docs: close all gap doc subsections + resolve Trace X entries\n- docs: add reviews/README.md and rewrite workspace_data/AGENTS.md\n\n## Test plan\n- [ ] Verify albatross refresh CLI runs cleanly\n- [ ] Verify daily report compiler generates expected output\n- [ ] Confirm documentation links resolve correctly\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(git worktree add:*)",
+      "Bash(git fetch:*)",
+      "Bash(git branch:*)",
+      "Bash(where:*)"
+    ]
+  }
+}

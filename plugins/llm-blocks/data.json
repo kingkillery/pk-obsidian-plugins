@@ -1,0 +1,13 @@
+{
+  "wsEndpoint": "wss://codex-appserver.tail1b8705.ts.net",
+  "model": "gpt-5.3-codex-spark",
+  "provider": "openai",
+  "baseUrl": "https://api.openai.com",
+  "temperature": 0.6,
+  "maxOutputTokens": 20000,
+  "autoReconnect": true,
+  "maxReconnectAttempts": 0,
+  "apiKey": "",
+  "customModelsJson": "[]",
+  "activeModelId": ""
+}
