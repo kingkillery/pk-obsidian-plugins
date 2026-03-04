@@ -28,6 +28,7 @@ interface DirectConfig {
 
 interface QueryOptions {
 	threadId?: string;
+	model?: string;
 }
 
 export class CodexWebSocketClient extends Events {
@@ -55,10 +56,10 @@ export class CodexWebSocketClient extends Events {
 	}
 
 	connect(): void {
-		const direct = this.getDirectConfig();
-		if (direct) {
+		if (this.settings.transportMode === "http") {
+			const direct = this.getDirectConfig();
 			this.sessionReady = true;
-			this.setAuth(direct.apiKey ? "authenticated" : "unauthenticated");
+			this.setAuth(direct?.apiKey ? "authenticated" : "unauthenticated");
 			this.setState("connected");
 			return;
 		}
@@ -98,8 +99,7 @@ export class CodexWebSocketClient extends Events {
 
 	async loginApiKey(apiKey: string): Promise<void> {
 		this.settings.apiKey = apiKey;
-		const direct = this.getDirectConfig();
-		if (direct) {
+		if (this.settings.transportMode === "http" && this.getDirectConfig()) {
 			this.sessionReady = true;
 			this.setAuth("authenticated");
 			this.setState("connected");
@@ -111,8 +111,8 @@ export class CodexWebSocketClient extends Events {
 	}
 
 	async loginChatGPT(): Promise<string> {
-		if (this.getDirectConfig()) {
-			throw new Error("ChatGPT login is disabled while direct model mode is active.");
+		if (this.settings.transportMode === "http") {
+			throw new Error("ChatGPT login is disabled in HTTP-only mode.");
 		}
 		const result = await this.rpcCall("account/login/start", { type: "chatgpt" }) as
 			{ authUrl?: string; type?: string } | null;
@@ -124,7 +124,19 @@ export class CodexWebSocketClient extends Events {
 
 	async query(prompt: string, options?: QueryOptions): Promise<QueryResult> {
 		const direct = this.getDirectConfig();
-		if (direct) {
+
+		if (this.settings.transportMode === "http") {
+			if (!direct) {
+				throw new Error("HTTP mode requires a configured model.");
+			}
+			return this.queryViaDirectApi(prompt, direct, options);
+		}
+
+		if (this.isReady) {
+			return this.queryViaWebSocket(prompt, options);
+		}
+
+		if (this.settings.transportMode === "auto" && direct) {
 			return this.queryViaDirectApi(prompt, direct, options);
 		}
 
@@ -135,13 +147,16 @@ export class CodexWebSocketClient extends Events {
 					: "Not connected to Codex server"
 			);
 		}
+		return this.queryViaWebSocket(prompt, options);
+	}
 
-		const requestedModel = (this.settings.model ?? "").trim();
+	private async queryViaWebSocket(prompt: string, options?: QueryOptions): Promise<QueryResult> {
+		const requestedModel = (options?.model ?? this.settings.model ?? "").trim();
 		let threadId = (options?.threadId ?? "").trim();
 		let modelHint = this.resolveModelName(requestedModel);
 		if (!threadId) {
 			const threadResult = await this.rpcCall("thread/start", {
-				...(this.settings.model ? { model: this.settings.model } : {}),
+				...(requestedModel ? { model: requestedModel } : {}),
 			}) as { thread?: { id?: string; model?: string } } | null;
 			threadId = threadResult?.thread?.id ?? "";
 			if (!threadId) throw new Error("Server did not return a thread ID");
@@ -156,7 +171,7 @@ export class CodexWebSocketClient extends Events {
 			threadId,
 			input: [{ type: "text", text: prompt }],
 		};
-		if (this.settings.model) turnParams.model = this.settings.model;
+		if (requestedModel) turnParams.model = requestedModel;
 
 		await this.rpcCall("turn/start", turnParams);
 
@@ -172,32 +187,53 @@ export class CodexWebSocketClient extends Events {
 	}
 
 	private async queryViaDirectApi(prompt: string, cfg: DirectConfig, options?: QueryOptions): Promise<QueryResult> {
+		const effectiveCfg = options?.model ? { ...cfg, model: options.model } : cfg;
 		if (!cfg.apiKey.trim()) {
 			throw new Error("Missing API key for active direct model.");
 		}
-		if (cfg.provider === "anthropic") {
-			return this.queryViaAnthropicCompatible(prompt, cfg, options);
+		if (effectiveCfg.provider === "anthropic") {
+			return this.queryViaAnthropicCompatible(prompt, effectiveCfg, options);
 		}
-		return this.queryViaOpenAICompatible(prompt, cfg, options);
+		return this.queryViaOpenAICompatible(prompt, effectiveCfg, options);
 	}
 
 	private async queryViaOpenAICompatible(prompt: string, cfg: DirectConfig, options?: QueryOptions): Promise<QueryResult> {
-		const endpoint = this.resolveEndpoint(cfg.baseUrl || "https://api.openai.com", "/v1/responses");
-		const body: Record<string, unknown> = {
+		const endpoint = this.resolveOpenAICompatibleEndpoint(cfg.baseUrl || "https://api.openai.com");
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${cfg.apiKey}`,
+		};
+		if (this.isOpenRouterBase(cfg.baseUrl)) {
+			headers["HTTP-Referer"] = "https://obsidian.md";
+			headers["X-Title"] = "LLM Blocks";
+		}
+
+		const responseBody: Record<string, unknown> = {
 			model: cfg.model || "gpt-4.1-mini",
 			input: prompt,
 			temperature: this.settings.temperature,
 			max_output_tokens: cfg.maxOutputTokens,
 		};
 
-		const response = await fetch(endpoint, {
+		let response = await fetch(endpoint.responses, {
 			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${cfg.apiKey}`,
-			},
-			body: JSON.stringify(body),
+			headers,
+			body: JSON.stringify(responseBody),
 		});
+
+		if (!response.ok && (this.isOpenRouterBase(cfg.baseUrl) || response.status === 404 || response.status === 405)) {
+			const chatBody: Record<string, unknown> = {
+				model: cfg.model || "gpt-4.1-mini",
+				messages: [{ role: "user", content: prompt }],
+				temperature: this.settings.temperature,
+				max_tokens: cfg.maxOutputTokens,
+			};
+			response = await fetch(endpoint.chatCompletions, {
+				method: "POST",
+				headers,
+				body: JSON.stringify(chatBody),
+			});
+		}
 
 		if (!response.ok) {
 			const text = await response.text();
@@ -593,9 +629,28 @@ export class CodexWebSocketClient extends Events {
 	}
 
 	private getDirectConfig(): DirectConfig | null {
-		// Force websocket transport mode only.
-		// Direct browser API mode causes CORS failures for Anthropic-compatible endpoints.
-		return null;
+		const active = this.getActiveCustomModel();
+		if (active) {
+			const provider = active.provider ?? this.settings.provider ?? "openai";
+			return {
+				provider,
+				baseUrl: (active.baseUrl ?? this.settings.baseUrl ?? "").trim() || this.defaultBaseUrlForProvider(provider),
+				apiKey: (active.apiKey ?? this.settings.apiKey ?? "").trim(),
+				model: (active.model ?? "").trim(),
+				maxOutputTokens: active.maxOutputTokens ?? this.settings.maxOutputTokens,
+			};
+		}
+
+		const model = (this.settings.model ?? "").trim();
+		if (!model) return null;
+		const provider = this.settings.provider ?? "openai";
+		return {
+			provider,
+			baseUrl: (this.settings.baseUrl ?? "").trim() || this.defaultBaseUrlForProvider(provider),
+			apiKey: (this.settings.apiKey ?? "").trim(),
+			model,
+			maxOutputTokens: this.settings.maxOutputTokens,
+		};
 	}
 
 	private resolveEndpoint(baseUrl: string, suffixPath: string): string {
@@ -608,6 +663,59 @@ export class CodexWebSocketClient extends Events {
 			return trimmed;
 		}
 		return `${trimmed.replace(/\/+$/, "")}${suffixPath}`;
+	}
+
+	private defaultBaseUrlForProvider(provider: LLMProvider): string {
+		if (provider === "anthropic") return "https://api.anthropic.com";
+		return "https://api.openai.com";
+	}
+
+	private isOpenRouterBase(baseUrl: string): boolean {
+		return /openrouter\.ai/i.test((baseUrl ?? "").trim());
+	}
+
+	private resolveOpenAICompatibleEndpoint(baseUrl: string): { responses: string; chatCompletions: string } {
+		const trimmed = (baseUrl ?? "").trim().replace(/\/+$/, "");
+		if (!trimmed) {
+			return {
+				responses: "https://api.openai.com/v1/responses",
+				chatCompletions: "https://api.openai.com/v1/chat/completions",
+			};
+		}
+
+		if (trimmed.endsWith("/v1/responses")) {
+			return {
+				responses: trimmed,
+				chatCompletions: `${trimmed.replace(/\/responses$/, "")}/chat/completions`,
+			};
+		}
+
+		if (trimmed.endsWith("/v1/chat/completions")) {
+			return {
+				responses: `${trimmed.replace(/\/chat\/completions$/, "")}/responses`,
+				chatCompletions: trimmed,
+			};
+		}
+
+		if (this.isOpenRouterBase(trimmed)) {
+			const base = trimmed.endsWith("/api/v1") ? trimmed : `${trimmed}/api/v1`;
+			return {
+				responses: `${base}/responses`,
+				chatCompletions: `${base}/chat/completions`,
+			};
+		}
+
+		if (trimmed.endsWith("/v1")) {
+			return {
+				responses: `${trimmed}/responses`,
+				chatCompletions: `${trimmed}/chat/completions`,
+			};
+		}
+
+		return {
+			responses: `${trimmed}/v1/responses`,
+			chatCompletions: `${trimmed}/v1/chat/completions`,
+		};
 	}
 
 	private extractText(payload: unknown): string {

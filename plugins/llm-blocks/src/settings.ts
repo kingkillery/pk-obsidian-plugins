@@ -2,6 +2,52 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import type LLMBlocksPlugin from "./main";
 import type { CustomModelConfig } from "./types";
 
+interface ModelPreset {
+	id: string;
+	label: string;
+	model: string;
+	temperature?: number;
+}
+
+const MODEL_PRESETS: ModelPreset[] = [
+	{
+		id: "gemini-3.1-pro",
+		label: "Gemini 3.1 Pro (Preview)",
+		model: "gemini-3.1-pro-preview",
+		temperature: 1.0,
+	},
+	{
+		id: "gemini-3-flash",
+		label: "Gemini 3 Flash (Preview)",
+		model: "gemini-3-flash-preview",
+		temperature: 1.0,
+	},
+	{
+		id: "gemini-3.1-flash-lite",
+		label: "Gemini 3.1 Flash-Lite (Preview)",
+		model: "gemini-3.1-flash-lite-preview",
+		temperature: 1.0,
+	},
+	{
+		id: "gemini-3.1-flash-image",
+		label: "Gemini 3.1 Flash Image (Preview)",
+		model: "gemini-3.1-flash-image-preview",
+		temperature: 1.0,
+	},
+	{
+		id: "gemini-3-pro-image",
+		label: "Gemini 3 Pro Image (Preview)",
+		model: "gemini-3-pro-image-preview",
+		temperature: 1.0,
+	},
+	{
+		id: "gemini-3-pro-deprecated",
+		label: "Gemini 3 Pro (Deprecated Preview)",
+		model: "gemini-3-pro-preview",
+		temperature: 1.0,
+	},
+];
+
 function parseCustomModels(raw: string): CustomModelConfig[] {
 	const trimmed = raw.trim();
 	if (!trimmed) return [];
@@ -60,8 +106,24 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 		containerEl.createEl("h3", { text: "Connection" });
 
 		new Setting(containerEl)
+			.setName("Transport mode")
+			.setDesc("Auto: prefer WebSocket, fallback to HTTP. WebSocket: server only. HTTP: direct provider API only")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("auto", "Auto (WebSocket preferred)")
+					.addOption("websocket", "WebSocket only")
+					.addOption("http", "HTTP only")
+					.setValue(this.plugin.settings.transportMode)
+					.onChange(async (value) => {
+						this.plugin.settings.transportMode = value as "auto" | "websocket" | "http";
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			);
+
+		new Setting(containerEl)
 			.setName("WebSocket endpoint")
-			.setDesc("Codex app-server WebSocket (used when no direct/custom model is active)")
+			.setDesc("Codex app-server WebSocket endpoint")
 			.addText((text) =>
 				text
 					.setPlaceholder("ws://127.0.0.1:4500")
@@ -142,7 +204,7 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Default API key")
-			.setDesc("Used for direct API mode when active custom model has no apiKey")
+			.setDesc("Used for direct HTTP API mode (and as fallback in Auto) when active custom model has no apiKey")
 			.addText((text) => {
 				text
 					.setPlaceholder("sk-...")
@@ -154,7 +216,13 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 				text.inputEl.type = "password";
 			});
 
-		if (authState === "unauthenticated" && connState === "connected" && !this.plugin.settings.apiKey.trim() && !usingCustomModel) {
+		if (
+			this.plugin.settings.transportMode !== "http" &&
+			authState === "unauthenticated" &&
+			connState === "connected" &&
+			!this.plugin.settings.apiKey.trim() &&
+			!usingCustomModel
+		) {
 			new Setting(containerEl)
 				.setName("Login with ChatGPT")
 				.setDesc("Opens a browser window to authenticate with your ChatGPT account")
@@ -177,6 +245,32 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 
 		// Model settings
 		containerEl.createEl("h3", { text: "Model" });
+
+		const selectedPresetByModel =
+			MODEL_PRESETS.find((preset) => preset.model === this.plugin.settings.model)?.id ?? "";
+
+		new Setting(containerEl)
+			.setName("Quick model presets")
+			.setDesc("Apply common model IDs to Default model")
+			.addDropdown((dropdown) => {
+				dropdown.addOption("", "Select a preset...");
+				for (const preset of MODEL_PRESETS) {
+					dropdown.addOption(preset.id, preset.label);
+				}
+				dropdown
+					.setValue(selectedPresetByModel)
+					.onChange(async (value) => {
+						const preset = MODEL_PRESETS.find((item) => item.id === value);
+						if (!preset) return;
+						this.plugin.settings.model = preset.model;
+						this.plugin.settings.provider = "openai";
+						if (typeof preset.temperature === "number") {
+							this.plugin.settings.temperature = preset.temperature;
+						}
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
 
 		new Setting(containerEl)
 			.setName("Default provider")

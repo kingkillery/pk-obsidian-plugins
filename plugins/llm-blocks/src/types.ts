@@ -1,4 +1,5 @@
 export type LLMProvider = "openai" | "anthropic";
+export type TransportMode = "auto" | "websocket" | "http";
 
 export interface CustomModelConfig {
 	id: string;
@@ -12,6 +13,7 @@ export interface CustomModelConfig {
 
 export interface LLMBlocksSettings {
 	wsEndpoint: string;
+	transportMode: TransportMode;
 	model: string;
 	provider: LLMProvider;
 	baseUrl: string;
@@ -26,6 +28,7 @@ export interface LLMBlocksSettings {
 
 export const DEFAULT_SETTINGS: LLMBlocksSettings = {
 	wsEndpoint: "ws://127.0.0.1:4500",
+	transportMode: "auto",
 	model: "",
 	provider: "openai",
 	baseUrl: "https://api.openai.com",

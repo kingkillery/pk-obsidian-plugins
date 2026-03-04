@@ -4,6 +4,9 @@ import { ResponseCache } from "./cache";
 import { CodexWebSocketClient } from "./websocket-client";
 import { LLMBlockRenderer } from "./renderer";
 import { LLMBlocksSettingTab } from "./settings";
+import { LLMCanvasModal } from "./canvas-modal";
+import { MarkdownView, Notice } from "obsidian";
+import { CANVAS_VIEW_TYPE, LLMCanvasSidebarView } from "./canvas-sidebar-view";
 
 export default class LLMBlocksPlugin extends Plugin {
 	settings: LLMBlocksSettings = DEFAULT_SETTINGS;
@@ -16,6 +19,7 @@ export default class LLMBlocksPlugin extends Plugin {
 		await this.loadSettings();
 
 		this.wsClient = new CodexWebSocketClient(this.settings);
+		this.registerView(CANVAS_VIEW_TYPE, (leaf) => new LLMCanvasSidebarView(leaf, this.wsClient));
 
 		// Status bar
 		this.statusBarEl = this.addStatusBarItem();
@@ -70,6 +74,32 @@ export default class LLMBlocksPlugin extends Plugin {
 			callback: () => { this.cache.clear(); },
 		});
 
+		this.addCommand({
+			id: "llm-open-canvas",
+			name: "Open LLM Canvas",
+			callback: () => { void this.openCanvasSidebar(); },
+		});
+
+		this.addCommand({
+			id: "llm-open-canvas-modal",
+			name: "Open LLM Canvas (Modal)",
+			callback: () => { new LLMCanvasModal(this.app, this.wsClient).open(); },
+		});
+
+		this.addCommand({
+			id: "llm-inline-replace-selection",
+			name: "Inline Replace Selection (Canvas)",
+			callback: () => {
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				const selection = view?.editor.getSelection().trim() ?? "";
+				if (!view || !selection) {
+					new Notice("Select markdown/code first, then run Inline Replace Selection.");
+					return;
+				}
+				void this.openCanvasSidebar();
+			},
+		});
+
 		// Connect immediately; onLayoutReady acts as a safe retry hook.
 		this.wsClient.connect();
 
@@ -80,7 +110,20 @@ export default class LLMBlocksPlugin extends Plugin {
 	}
 
 	onunload(): void {
+		this.app.workspace.detachLeavesOfType(CANVAS_VIEW_TYPE);
 		this.wsClient.disconnect();
+	}
+
+	private async openCanvasSidebar(): Promise<void> {
+		let leaf = this.app.workspace.getLeavesOfType(CANVAS_VIEW_TYPE)[0] ?? null;
+		if (!leaf) {
+			leaf = this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf("split");
+		}
+		await leaf.setViewState({
+			type: CANVAS_VIEW_TYPE,
+			active: true,
+		});
+		await this.app.workspace.revealLeaf(leaf);
 	}
 
 	async loadSettings(): Promise<void> {
