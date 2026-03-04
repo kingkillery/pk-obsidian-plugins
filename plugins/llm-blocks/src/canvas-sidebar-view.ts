@@ -39,6 +39,11 @@ export class LLMCanvasSidebarView extends ItemView {
 		return "bot";
 	}
 
+	/** Prevent crashes from plugins that call getViewData on the active leaf. */
+	getViewData(): string {
+		return "";
+	}
+
 	async onOpen(): Promise<void> {
 		this.buildUi();
 		this.bindToActiveNote();
