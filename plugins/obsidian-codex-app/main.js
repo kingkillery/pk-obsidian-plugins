@@ -119,7 +119,14 @@ var BackendManager = class {
       this.setState("stopped", null);
       return this.getSnapshot();
     }
-    await this.requestJson("/unmount", {});
+    try {
+      await this.requestJson("/unmount", {});
+    } catch (error) {
+      this.appendLog("system", `Unmount request failed: ${error instanceof Error ? error.message : String(error)}.`);
+      this.resetRuntime();
+      this.setState("stopped", null);
+      return this.getSnapshot();
+    }
     this.mounted = false;
     this.pid = null;
     this.setState("ready", null);
@@ -442,7 +449,10 @@ var CodexMounterView = class extends import_obsidian3.ItemView {
       window.clearTimeout(this.boundsTimer);
       this.boundsTimer = null;
     }
-    await this.plugin.backendManager.unmount();
+    try {
+      await this.plugin.backendManager.unmount();
+    } catch {
+    }
   }
   async mountCodex() {
     const bounds = this.getStageBounds();
