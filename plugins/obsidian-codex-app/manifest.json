@@ -1,0 +1,9 @@
+{
+  "id": "codex-mounter",
+  "name": "Codex Mounter",
+  "version": "0.1.0",
+  "minAppVersion": "1.6.0",
+  "description": "Mounts a dedicated Codex desktop app window inside an Obsidian tab on Windows.",
+  "author": "pk",
+  "isDesktopOnly": true
+}

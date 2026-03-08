@@ -5,3 +5,6 @@ plugins/**/.obsidian/
 /plugins/tasknotes/tasknotes-e2e-vault/.obsidian/
 node_modules/
 **/data.json
+/plugins/obsidian-codex-app/obsidian-codex-scaffold/
+/plugins/obsidian-codex-app/backend/*.exe
+/plugins/obsidian-codex-app/bin/*.exe

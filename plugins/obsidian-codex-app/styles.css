@@ -1,0 +1,79 @@
+.codex-mounter-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+  padding: 12px;
+}
+
+.codex-mounter-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.codex-mounter-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  letter-spacing: 0.01em;
+}
+
+.codex-mounter-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.codex-mounter-shell {
+  position: relative;
+  flex: 1;
+  min-height: 280px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, var(--background-primary-alt), var(--background-primary));
+}
+
+.codex-mounter-shell.is-mounted {
+  background: var(--background-primary);
+}
+
+.codex-mounter-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: color-mix(in srgb, var(--background-primary) 92%, transparent);
+}
+
+.codex-mounter-shell.is-mounted .codex-mounter-overlay {
+  display: none;
+}
+
+.codex-mounter-overlay h3,
+.codex-mounter-overlay p {
+  margin: 0;
+}
+
+.codex-mounter-overlay p {
+  max-width: 52ch;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.codex-mounter-stage {
+  width: 100%;
+  height: 100%;
+}

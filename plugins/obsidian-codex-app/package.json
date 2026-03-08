@@ -1,0 +1,17 @@
+{
+  "name": "obsidian-codex-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs",
+    "build:helper": "powershell -Command \"New-Item -ItemType Directory -Force bin | Out-Null; Set-Location backend; go build -o ../bin/codex-mounter.exe ./cmd/mounter\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.8.10",
+    "typescript": "^5.8.2"
+  }
+}
