@@ -1,0 +1,9 @@
+{
+	"id": "optimized-learning",
+	"name": "Optimized Learning",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Build NotebookLM-based learning resources and study workflows inside Obsidian.",
+	"author": "Preston Nackos",
+	"isDesktopOnly": true
+}
