@@ -89,7 +89,6 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		// Connection + auth status
 		const statusDiv = containerEl.createDiv({ cls: "llm-settings-status" });
 		const connState = this.plugin.wsClient.connectionState;
 		const authState = this.plugin.wsClient.authState;
@@ -106,7 +105,6 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 			statusDiv.createEl("br");
 			statusDiv.createSpan({ text: ` Active custom model: ${activeCustom.displayName ?? activeCustom.id}` });
 		}
-
 		if (connState === "connected") {
 			const authDot =
 				authState === "authenticated" ? "llm-dot-green" :
@@ -117,211 +115,30 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 			statusDiv.createSpan({ text: ` Auth: ${authState}` });
 		}
 
-		// Connection settings
+		const showAdvanced = this.plugin.settings.showAdvancedSettings;
+
+		// Keep core workflow settings visible by default
 		containerEl.createEl("h3", { text: "Connection" });
-
 		new Setting(containerEl)
-			.setName("Transport mode")
-			.setDesc("Auto: prefer WebSocket, fallback to HTTP. WebSocket: server only. HTTP: direct provider API only")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("auto", "Auto (WebSocket preferred)")
-					.addOption("websocket", "WebSocket only")
-					.addOption("http", "HTTP only")
-					.setValue(this.plugin.settings.transportMode)
-					.onChange(async (value) => {
-						this.plugin.settings.transportMode = value as "auto" | "websocket" | "http";
-						await this.plugin.saveSettings();
-						this.display();
-					})
-			);
+			.setName("API connection status")
+			.setDesc("The status area above shows WebSocket/auth health and active custom model.");
 
-		new Setting(containerEl)
-			.setName("WebSocket endpoint")
-			.setDesc("Codex app-server WebSocket endpoint")
-			.addText((text) =>
-				text
-					.setPlaceholder("ws://127.0.0.1:4500")
-					.setValue(this.plugin.settings.wsEndpoint)
-					.onChange(async (value) => {
-						this.plugin.settings.wsEndpoint = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Auto-reconnect")
-			.setDesc("Automatically reconnect on disconnection")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoReconnect)
-					.onChange(async (value) => {
-						this.plugin.settings.autoReconnect = value;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Reconnect now")
-			.setDesc("Reconnect websocket mode")
-			.addButton((btn) =>
-				btn.setButtonText("Reconnect").onClick(() => {
-					this.plugin.wsClient.disconnect();
-					this.plugin.wsClient.connect();
-					setTimeout(() => this.display(), 1500);
-				})
-			);
-
-		// Custom model profiles
-		containerEl.createEl("h3", { text: "Custom Models" });
-
-		new Setting(containerEl)
-			.setName("Custom models JSON")
-			.setDesc("Paste an array of model configs. Fields: id, displayName, provider, baseUrl, apiKey, model, maxOutputTokens")
-			.addTextArea((text) => {
-				text
-					.setPlaceholder('[{"id":"custom:model-1","provider":"anthropic","baseUrl":"https://api.example.com/anthropic","apiKey":"...","model":"ModelName","maxOutputTokens":64000}]')
-					.setValue(this.plugin.settings.customModelsJson)
-					.onChange(async (value) => {
-						this.plugin.settings.customModelsJson = value;
-						await this.plugin.saveSettings();
-						this.display();
-					});
-				text.inputEl.rows = 8;
-				text.inputEl.cols = 80;
-			});
-
-		if (this.plugin.settings.customModelsJson.trim() && customModels.length === 0) {
-			new Setting(containerEl)
-				.setName("Custom models JSON status")
-				.setDesc("Could not parse JSON. Fix JSON syntax to enable profile switching.");
-		}
-
-		new Setting(containerEl)
-			.setName("Active custom model")
-			.setDesc("If selected, plugin uses this model/provider directly and bypasses websocket")
-			.addDropdown((dropdown) => {
-				dropdown.addOption("", "(none)");
-				for (const model of customModels) {
-					dropdown.addOption(model.id, model.displayName ?? model.id);
-				}
-				dropdown
-					.setValue(this.plugin.settings.activeModelId)
-					.onChange(async (value) => {
-						this.plugin.settings.activeModelId = value;
-						await this.plugin.saveSettings();
-						this.display();
-					});
-			});
-
-		// Auth settings
-		containerEl.createEl("h3", { text: "Authentication" });
-
-		new Setting(containerEl)
-			.setName("Default API key")
-			.setDesc("Used for direct HTTP API mode (and as fallback in Auto) when active custom model has no apiKey")
-			.addText((text) => {
-				text
-					.setPlaceholder("sk-...")
-					.setValue(this.plugin.settings.apiKey)
-					.onChange(async (value) => {
-						this.plugin.settings.apiKey = value;
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = "password";
-			});
-
-		for (const field of PROVIDER_KEY_FIELDS) {
-			new Setting(containerEl)
-				.setName(field.name)
-				.setDesc(`Used when provider/model routing targets ${field.provider}`)
-				.addText((text) => {
-					text
-						.setPlaceholder(field.placeholder)
-						.setValue(this.plugin.settings.providerApiKeys?.[field.provider] ?? "")
-						.onChange(async (value) => {
-							this.plugin.settings.providerApiKeys = {
-								...(this.plugin.settings.providerApiKeys ?? {}),
-								[field.provider]: value,
-							};
-							await this.plugin.saveSettings();
-						});
-					text.inputEl.type = "password";
-				});
-		}
-
-		if (
-			this.plugin.settings.transportMode !== "http" &&
-			authState === "unauthenticated" &&
-			connState === "connected" &&
-			!this.plugin.settings.apiKey.trim() &&
-			!usingCustomModel
-		) {
-			new Setting(containerEl)
-				.setName("Login with ChatGPT")
-				.setDesc("Opens a browser window to authenticate with your ChatGPT account")
-				.addButton((btn) =>
-					btn.setButtonText("Login with ChatGPT").setCta().onClick(async () => {
-						btn.setDisabled(true);
-						btn.setButtonText("Opening browser...");
-						try {
-							const url = await this.plugin.wsClient.loginChatGPT();
-							window.open(url);
-							btn.setButtonText("Waiting for login...");
-							// Auth change event will refresh settings tab
-						} catch (e) {
-							btn.setButtonText("Login failed - retry");
-							btn.setDisabled(false);
-						}
-					})
-				);
-		}
-
-		// Model settings
 		containerEl.createEl("h3", { text: "Model" });
 
-		const selectedPresetByModel =
-			MODEL_PRESETS.find((preset) => preset.model === this.plugin.settings.model)?.id ?? "";
-
 		new Setting(containerEl)
-			.setName("Quick model presets")
-			.setDesc("Apply common model IDs to Default model")
+			.setName("Default runtime provider")
+			.setDesc("Used for direct API mode when no active custom model is selected")
 			.addDropdown((dropdown) => {
-				dropdown.addOption("", "Select a preset...");
-				for (const preset of MODEL_PRESETS) {
-					dropdown.addOption(preset.id, preset.label);
+				for (const option of DIRECT_PROVIDER_OPTIONS) {
+					dropdown.addOption(option.value, option.label);
 				}
-				dropdown
-					.setValue(selectedPresetByModel)
+				return dropdown
+					.setValue(this.plugin.settings.provider)
 					.onChange(async (value) => {
-						const preset = MODEL_PRESETS.find((item) => item.id === value);
-						if (!preset) return;
-						this.plugin.settings.model = preset.model;
-						this.plugin.settings.provider = "openai";
-						if (typeof preset.temperature === "number") {
-							this.plugin.settings.temperature = preset.temperature;
-						}
+						this.plugin.settings.provider = value as LLMProvider;
 						await this.plugin.saveSettings();
-						this.display();
 					});
 			});
-
-		new Setting(containerEl)
-			.setName("Default provider")
-			.setDesc("Direct API provider used when no active custom model is selected")
-			.addDropdown((dropdown) =>
-				{
-					for (const option of DIRECT_PROVIDER_OPTIONS) {
-						dropdown.addOption(option.value, option.label);
-					}
-					return dropdown
-						.setValue(this.plugin.settings.provider)
-						.onChange(async (value) => {
-							this.plugin.settings.provider = value as LLMProvider;
-							await this.plugin.saveSettings();
-						});
-				}
-			);
 
 		new Setting(containerEl)
 			.setName("Default base URL")
@@ -379,9 +196,79 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					})
 			);
 
-		// Cache
-		containerEl.createEl("h3", { text: "Cache" });
+		const selectedPresetByModel =
+			MODEL_PRESETS.find((preset) => preset.model === this.plugin.settings.model)?.id ?? "";
+		new Setting(containerEl)
+			.setName("Quick model presets")
+			.setDesc("Apply common model IDs to the default model")
+			.addDropdown((dropdown) => {
+				dropdown.addOption("", "Select a preset...");
+				for (const preset of MODEL_PRESETS) {
+					dropdown.addOption(preset.id, preset.label);
+				}
+				dropdown
+					.setValue(selectedPresetByModel)
+					.onChange(async (value) => {
+						const preset = MODEL_PRESETS.find((item) => item.id === value);
+						if (!preset) return;
+						this.plugin.settings.model = preset.model;
+						this.plugin.settings.provider = "openai";
+						if (typeof preset.temperature === "number") {
+							this.plugin.settings.temperature = preset.temperature;
+						}
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
 
+		containerEl.createEl("h3", { text: "Authentication" });
+		new Setting(containerEl)
+			.setName("Default API key")
+			.setDesc("Used for direct HTTP API mode when no per-provider key is set")
+			.addText((text) => {
+				text
+					.setPlaceholder("sk-...")
+					.setValue(this.plugin.settings.apiKey)
+					.onChange(async (value) => {
+						this.plugin.settings.apiKey = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "password";
+			});
+
+		for (const field of PROVIDER_KEY_FIELDS) {
+			new Setting(containerEl)
+				.setName(field.name)
+				.setDesc(`Used when the selected execution path targets ${field.provider}`)
+				.addText((text) => {
+					text
+						.setPlaceholder(field.placeholder)
+						.setValue(this.plugin.settings.providerApiKeys?.[field.provider] ?? "")
+						.onChange(async (value) => {
+							this.plugin.settings.providerApiKeys = {
+								...(this.plugin.settings.providerApiKeys ?? {}),
+								[field.provider]: value,
+							};
+							await this.plugin.saveSettings();
+						});
+					text.inputEl.type = "password";
+				});
+		}
+
+		new Setting(containerEl)
+			.setName("Show advanced settings")
+			.setDesc("Use advanced settings only for transport control, custom models, and auth overrides.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(showAdvanced)
+					.onChange(async (value) => {
+						this.plugin.settings.showAdvancedSettings = value;
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			);
+
+		containerEl.createEl("h3", { text: "Cache" });
 		new Setting(containerEl)
 			.setName("Clear response cache")
 			.setDesc(`${this.plugin.cache.size} cached responses`)
@@ -391,5 +278,128 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					this.display();
 				})
 			);
+
+		if (!showAdvanced) return;
+
+		containerEl.createEl("h3", { text: "Advanced" });
+
+		containerEl.createEl("h4", { text: "Connection and transport" });
+		new Setting(containerEl)
+			.setName("Transport mode")
+			.setDesc("How the plugin sends requests: direct API or Codex server.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("auto", "Auto (WebSocket preferred)")
+					.addOption("websocket", "WebSocket only")
+					.addOption("http", "HTTP only")
+					.setValue(this.plugin.settings.transportMode)
+					.onChange(async (value) => {
+						this.plugin.settings.transportMode = value as "auto" | "websocket" | "http";
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("WebSocket endpoint")
+			.setDesc("Codex app-server WebSocket endpoint")
+			.addText((text) =>
+				text
+					.setPlaceholder("ws://127.0.0.1:4500")
+					.setValue(this.plugin.settings.wsEndpoint)
+					.onChange(async (value) => {
+						this.plugin.settings.wsEndpoint = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Auto-reconnect")
+			.setDesc("Automatically reconnect on disconnection")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoReconnect)
+					.onChange(async (value) => {
+						this.plugin.settings.autoReconnect = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Reconnect now")
+			.setDesc("Reconnect websocket mode")
+			.addButton((btn) =>
+				btn.setButtonText("Reconnect").onClick(() => {
+					this.plugin.wsClient.disconnect();
+					this.plugin.wsClient.connect();
+					setTimeout(() => this.display(), 1500);
+				})
+			);
+
+		containerEl.createEl("h4", { text: "Custom model profiles" });
+		new Setting(containerEl)
+			.setName("Custom models JSON")
+			.setDesc("Paste an array of model configs. Fields: id, displayName, provider, baseUrl, apiKey, model, maxOutputTokens")
+			.addTextArea((text) => {
+				text
+					.setPlaceholder('[{"id":"custom:model-1","provider":"anthropic","baseUrl":"https://api.example.com/anthropic","apiKey":"...","model":"ModelName","maxOutputTokens":64000}]')
+					.setValue(this.plugin.settings.customModelsJson)
+					.onChange(async (value) => {
+						this.plugin.settings.customModelsJson = value;
+						await this.plugin.saveSettings();
+						this.display();
+					});
+				text.inputEl.rows = 8;
+				text.inputEl.cols = 80;
+			});
+
+		if (this.plugin.settings.customModelsJson.trim() && customModels.length === 0) {
+			new Setting(containerEl)
+				.setName("Custom models JSON status")
+				.setDesc("Could not parse JSON. Fix JSON syntax to enable profile switching.");
+		}
+
+		new Setting(containerEl)
+			.setName("Active custom model")
+			.setDesc("If selected, plugin uses this model/provider directly and bypasses websocket transport selection.")
+			.addDropdown((dropdown) => {
+				dropdown.addOption("", "(none)");
+				for (const model of customModels) {
+					dropdown.addOption(model.id, model.displayName ?? model.id);
+				}
+				dropdown
+					.setValue(this.plugin.settings.activeModelId)
+					.onChange(async (value) => {
+						this.plugin.settings.activeModelId = value;
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
+
+		if (
+			this.plugin.settings.transportMode !== "http" &&
+			authState === "unauthenticated" &&
+			connState === "connected" &&
+			!this.plugin.settings.apiKey.trim() &&
+			!usingCustomModel
+		) {
+			new Setting(containerEl)
+				.setName("Login with ChatGPT")
+				.setDesc("Opens a browser window to authenticate with your ChatGPT account")
+				.addButton((btn) =>
+					btn.setButtonText("Login with ChatGPT").setCta().onClick(async () => {
+						btn.setDisabled(true);
+						btn.setButtonText("Opening browser...");
+						try {
+							const url = await this.plugin.wsClient.loginChatGPT();
+							window.open(url);
+							btn.setButtonText("Waiting for login...");
+						} catch (e) {
+							btn.setButtonText("Login failed - retry");
+							btn.setDisabled(false);
+						}
+					})
+				);
+		}
 	}
 }

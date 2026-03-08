@@ -21,6 +21,8 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 	private threadId: string | null = null;
 	private transcriptMarkdown = "";
 	private modelSelect!: HTMLSelectElement;
+	private runBtn!: HTMLButtonElement;
+	private runtimeHintEl!: HTMLElement;
 	private readonly availableModels: RuntimeModelOption[] = RUNTIME_MODEL_OPTIONS;
 
 	constructor(
@@ -53,37 +55,32 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		header.createSpan({ cls: "llm-block-label", text: "LLM Prompt" });
 		const headerActions = header.createDiv({ cls: "llm-block-header-actions" });
 		const modelWrap = headerActions.createDiv({ cls: "llm-canvas-option" });
-		modelWrap.createSpan({ text: "Provider" });
+		modelWrap.createSpan({ text: "Execution path" });
 		this.modelSelect = modelWrap.createEl("select", { cls: "llm-block-model-select" });
 		for (const option of this.availableModels) {
 			this.modelSelect.createEl("option", { value: option.id, text: option.label });
 		}
+		this.runtimeHintEl = modelWrap.createDiv({ cls: "llm-canvas-runtime-hint" });
 		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
+		this.modelSelect.addEventListener("change", () => {
+			if (this.running) return;
+			void this.syncCachedResponse();
+			this.syncRuntimeHint();
+		});
+		this.syncRuntimeHint();
 
-		const btn = headerActions.createEl("button", {
+		this.runBtn = headerActions.createEl("button", {
 			cls: "llm-block-run-btn",
 			text: "Start",
 		});
-		btn.addEventListener("click", () => this.runPrimaryPrompt());
+		this.runBtn.addEventListener("click", () => this.runPrimaryPrompt());
 
 		// Prompt display
 		const promptEl = el.createDiv({ cls: "llm-block-prompt" });
 		promptEl.createEl("pre", { text: this.prompt });
 
-		let cached = undefined;
-		try {
-			cached = await this.cache.get(this.prompt);
-		} catch (error) {
-			console.warn("LLM Blocks: failed to read cached response", error);
-		}
-
-		// Response area
-		if (cached) {
-			btn.setText("Refresh");
-			this.hasRun = true;
-			this.transcriptMarkdown = cached.markdown;
-			this.renderResponse(el, this.transcriptMarkdown);
-		}
+		this.syncRuntimeHint();
+		await this.syncCachedResponse();
 	}
 
 	private async runPrimaryPrompt(): Promise<void> {
@@ -158,7 +155,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 				append && this.transcriptMarkdown
 					? `${this.transcriptMarkdown}\n\n---\n\n${turnMarkdown}`
 					: turnMarkdown;
-			await this.cache.set(this.prompt, this.transcriptMarkdown);
+			await this.cache.set(this.prompt, this.transcriptMarkdown, this.getRuntimeCacheVariant());
 
 			spinner.remove();
 			this.hasRun = true;
@@ -191,10 +188,58 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 
 	private getSelectedRuntime(): RuntimeModelOption {
 		const selected = resolveRuntimeModelOption(this.modelSelect?.value);
-		this.modelSelect.title = selected.transportMode === "websocket"
-			? `${selected.label} via Codex appserver`
-			: `${selected.label} | ${selected.model}`;
+		this.modelSelect.title = this.getRuntimeHintText(selected);
 		return selected;
+	}
+
+	private syncRuntimeHint(): void {
+		const selected = this.getSelectedRuntime();
+		if (this.runtimeHintEl) {
+			this.runtimeHintEl.textContent = this.getRuntimeHintText(selected);
+		}
+	}
+
+	private getRuntimeHintText(selected: RuntimeModelOption): string {
+		return selected.transportMode === "websocket"
+			? "Execution path: Codex appserver (WebSocket)"
+			: `Execution path: direct API (${selected.provider ?? "provider"}) ${selected.model}`;
+	}
+
+	private getRuntimeCacheVariant(): string {
+		const selected = this.getSelectedRuntime();
+		return JSON.stringify({
+			runtimeId: selected.id,
+			transportMode: selected.transportMode,
+			provider: selected.provider ?? "",
+			baseUrl: selected.baseUrl ?? "",
+			model: selected.model ?? "",
+		});
+	}
+
+	private async syncCachedResponse(): Promise<void> {
+		let cached = undefined;
+		try {
+			cached = await this.cache.get(this.prompt, this.getRuntimeCacheVariant());
+		} catch (error) {
+			console.warn("LLM Blocks: failed to read cached response", error);
+		}
+
+		const existingResponse = this.containerEl.querySelector(".llm-block-response");
+		if (existingResponse) {
+			existingResponse.remove();
+		}
+
+		if (cached) {
+			this.hasRun = true;
+			this.transcriptMarkdown = cached.markdown;
+			this.runBtn?.setText("Refresh");
+			this.renderResponse(this.containerEl, this.transcriptMarkdown);
+			return;
+		}
+
+		this.hasRun = false;
+		this.transcriptMarkdown = "";
+		this.runBtn?.setText("Start");
 	}
 
 	private formatTurn(userPrompt: string, result: QueryResult): string {

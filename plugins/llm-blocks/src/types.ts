@@ -27,6 +27,7 @@ export interface LLMBlocksSettings {
 	providerApiKeys: ProviderApiKeys;
 	customModelsJson: string;
 	activeModelId: string;
+	showAdvancedSettings: boolean;
 }
 
 export const DEFAULT_SETTINGS: LLMBlocksSettings = {
@@ -43,6 +44,7 @@ export const DEFAULT_SETTINGS: LLMBlocksSettings = {
 	providerApiKeys: {},
 	customModelsJson: "",
 	activeModelId: "",
+	showAdvancedSettings: false,
 };
 
 export type AuthState = "unchecked" | "authenticated" | "unauthenticated";

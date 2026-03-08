@@ -23,6 +23,7 @@ export class LLMCanvasModal extends Modal {
 	private liveApplyToggle!: HTMLInputElement;
 	private scopeSelect!: HTMLSelectElement;
 	private modelSelect!: HTMLSelectElement;
+	private runtimeHint!: HTMLElement;
 	private running = false;
 	private output = "";
 	private targetStartOffset = 0;
@@ -67,12 +68,15 @@ export class LLMCanvasModal extends Modal {
 		this.scopeSelect.value = this.options.initialScope ?? "selection";
 
 		const modelWrap = optionsRow.createDiv({ cls: "llm-canvas-option" });
-		modelWrap.createSpan({ text: "Provider" });
+		modelWrap.createSpan({ text: "Execution path" });
 		this.modelSelect = modelWrap.createEl("select");
 		for (const option of this.availableModels) {
 			this.modelSelect.createEl("option", { value: option.id, text: option.label });
 		}
 		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
+		this.modelSelect.addEventListener("change", () => this.refreshRuntimeHint());
+		this.runtimeHint = optionsRow.createDiv({ cls: "llm-canvas-runtime-hint" });
+		this.refreshRuntimeHint();
 
 		const liveWrap = optionsRow.createDiv({ cls: "llm-canvas-option" });
 		this.liveApplyToggle = liveWrap.createEl("input", { type: "checkbox" });
@@ -154,6 +158,7 @@ export class LLMCanvasModal extends Modal {
 			this.modelSelect.createEl("option", { value: option.id, text: option.label });
 		}
 		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
+		this.modelSelect.addEventListener("change", () => this.refreshRuntimeHint());
 		this.promptInput = bar.createEl("input", {
 			cls: "llm-canvas-inline-input",
 			type: "text",
@@ -161,6 +166,8 @@ export class LLMCanvasModal extends Modal {
 		});
 		this.runBtn = bar.createEl("button", { cls: "llm-canvas-inline-send", text: "Send" });
 		this.applyBtn = bar.createEl("button", { cls: "llm-canvas-inline-send llm-canvas-inline-apply", text: "Apply" });
+		this.runtimeHint = contentEl.createDiv({ cls: "llm-canvas-runtime-hint" });
+		this.refreshRuntimeHint();
 
 		this.scopeSelect = contentEl.createEl("select");
 		this.scopeSelect.style.display = "none";
@@ -269,6 +276,7 @@ export class LLMCanvasModal extends Modal {
 		this.running = true;
 		this.runBtn.disabled = true;
 		this.modelSelect.disabled = true;
+		this.refreshRuntimeHint();
 		this.runBtn.setText(this.options.inlineMode ? "Sending..." : "Generating...");
 		this.output = "";
 		this.outputRaw.value = "";
@@ -305,16 +313,26 @@ export class LLMCanvasModal extends Modal {
 			this.running = false;
 			this.runBtn.disabled = false;
 			this.modelSelect.disabled = false;
+			this.refreshRuntimeHint();
 			this.runBtn.setText(this.options.inlineMode ? "Send" : "Generate");
 		}
 	}
 
 	private getSelectedRuntime(): RuntimeModelOption {
 		const selected = resolveRuntimeModelOption(this.modelSelect?.value);
-		this.modelSelect.title = selected.transportMode === "websocket"
-			? `${selected.label} via Codex appserver`
-			: `${selected.label} | ${selected.model}`;
+		this.modelSelect.title = this.getRuntimeHintText(selected);
 		return selected;
+	}
+
+	private refreshRuntimeHint(): void {
+		const selected = this.getSelectedRuntime();
+		this.runtimeHint.setText(this.getRuntimeHintText(selected));
+	}
+
+	private getRuntimeHintText(selected: RuntimeModelOption): string {
+		return selected.transportMode === "websocket"
+			? "Execution path: Codex appserver (WebSocket)"
+			: `Execution path: direct API (${selected.provider ?? "provider"}) ${selected.model}`;
 	}
 
 	private applyOutputToEditor(): boolean {

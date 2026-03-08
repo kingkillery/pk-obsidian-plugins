@@ -217,6 +217,28 @@
 	font-size: var(--font-smaller);
 }
 
+.llm-canvas-inline-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.llm-canvas-inline-meta span {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: var(--font-smaller);
+}
+
+.llm-canvas-runtime-hint {
+	font-size: var(--font-smaller);
+	color: var(--text-muted);
+	line-height: 1.25;
+}
+
 .llm-canvas {
 	display: flex;
 	flex-direction: column;
@@ -372,6 +394,11 @@
 	font-weight: var(--font-semibold);
 }
 
+.llm-canvas-inline-send:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
 .llm-canvas-inline-apply {
 	background: var(--background-secondary);
 	color: var(--text-normal);
@@ -392,7 +419,8 @@
 }
 
 .llm-canvas-inline-hint {
-	text-align: center;
+	color: var(--text-muted);
+	font-size: var(--font-smaller);
 }
 
 .llm-canvas-docked {

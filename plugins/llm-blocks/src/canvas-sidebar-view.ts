@@ -21,6 +21,8 @@ export class LLMCanvasSidebarView extends ItemView {
 	private beforePreview!: HTMLElement;
 	private fileBadge!: HTMLElement;
 	private scopeBadge!: HTMLElement;
+	private contextHint!: HTMLElement;
+	private runtimeHint!: HTMLElement;
 
 	private boundFilePath = "";
 	private scope: ReplaceScope = "selection";
@@ -67,12 +69,17 @@ export class LLMCanvasSidebarView extends ItemView {
 
 		const top = contentEl.createDiv({ cls: "llm-canvas-inline-top" });
 		top.createEl("h2", { text: "Canvas" }).addClass("llm-canvas-inline-title");
-		const bindBtn = top.createEl("button", { text: "Bind Current Note" });
+		const bindBtn = top.createEl("button", { text: "Use Current Note" });
 		bindBtn.addEventListener("click", () => this.bindToActiveNote());
 
 		const meta = contentEl.createDiv({ cls: "llm-canvas-inline-meta" });
 		this.fileBadge = meta.createSpan({ text: "No note bound" });
-		this.scopeBadge = meta.createSpan({ text: "Scope: selection" });
+		this.scopeBadge = meta.createSpan({ text: "Target: none" });
+		this.runtimeHint = meta.createSpan({ cls: "llm-canvas-runtime-hint", text: "Execution path: not set" });
+		this.contextHint = contentEl.createDiv({
+			cls: "llm-canvas-inline-hint",
+			text: "Canvas edits only the bound target. Click Use Current Note to refresh target selection.",
+		});
 
 		const quickRow = contentEl.createDiv({ cls: "llm-canvas-quick-actions" });
 		this.addQuickAction(quickRow, "Fix", "Fix bugs and improve correctness in this selection.");
@@ -89,20 +96,22 @@ export class LLMCanvasSidebarView extends ItemView {
 		this.outputPreview = after.createDiv({ cls: "llm-canvas-preview markdown-rendered" });
 
 		const bar = contentEl.createDiv({ cls: "llm-canvas-inline-bar" });
-		const addBtn = bar.createEl("button", { cls: "llm-canvas-inline-icon", text: "+" });
-		addBtn.addEventListener("click", () => this.promptInput.focus());
 		this.modelSelect = bar.createEl("select", { cls: "llm-block-model-select" });
 		for (const option of this.availableModels) {
 			this.modelSelect.createEl("option", { value: option.id, text: option.label });
 		}
 		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
+		this.modelSelect.addEventListener("change", () => {
+			this.refreshRuntimeHint();
+		});
 		this.promptInput = bar.createEl("input", {
 			cls: "llm-canvas-inline-input",
 			type: "text",
-			placeholder: "Ask anything about this selection...",
+			placeholder: "Rewrite or ask about the bound content...",
 		});
-		this.runBtn = bar.createEl("button", { cls: "llm-canvas-inline-send", text: "Send" });
+		this.runBtn = bar.createEl("button", { cls: "llm-canvas-inline-send", text: "Generate" });
 		this.applyBtn = bar.createEl("button", { cls: "llm-canvas-inline-send llm-canvas-inline-apply", text: "Apply" });
+		this.applyBtn.disabled = true;
 
 		this.runBtn.addEventListener("click", () => { void this.runCanvas(); });
 		this.promptInput.addEventListener("keydown", (evt) => {
@@ -129,11 +138,13 @@ export class LLMCanvasSidebarView extends ItemView {
 		});
 	}
 
-	private bindToActiveNote(): void {
+	private bindToActiveNote(notifyOnFailure = true): boolean {
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!view || !view.file) {
-			new Notice("Open a markdown note first.");
-			return;
+			if (notifyOnFailure) {
+				new Notice("Open a markdown note first.");
+			}
+			return false;
 		}
 		this.boundFilePath = view.file.path;
 		const editor = view.editor;
@@ -150,8 +161,13 @@ export class LLMCanvasSidebarView extends ItemView {
 			this.targetEndOffset = editor.getValue().length;
 		}
 		this.fileBadge.setText(view.file.basename);
-		this.scopeBadge.setText(`Scope: ${this.scope}`);
+		this.scopeBadge.setText(`Target: ${this.scope}`);
+		this.refreshRuntimeHint();
+		this.output = "";
+		this.outputPreview.empty();
+		this.updateApplyButtonState();
 		this.refreshBeforePreview();
+		return true;
 	}
 
 	private refreshBeforePreview(): void {
@@ -182,8 +198,8 @@ export class LLMCanvasSidebarView extends ItemView {
 			new Notice("Add an instruction first.");
 			return;
 		}
-		if (!this.boundFilePath) {
-			this.bindToActiveNote();
+		if (!this.boundFilePath && !this.bindToActiveNote()) {
+			return;
 		}
 		const editor = this.getBoundEditor();
 		if (!editor) {
@@ -206,14 +222,15 @@ export class LLMCanvasSidebarView extends ItemView {
 		this.running = true;
 		this.runBtn.disabled = true;
 		this.modelSelect.disabled = true;
-		this.runBtn.setText("Sending...");
+		this.runBtn.setText("Generating...");
 		this.output = "";
 		this.outputPreview.empty();
+		this.updateApplyButtonState();
 
 		const onDelta = (delta: string) => {
 			this.output += delta;
 			void this.renderPreview();
-			this.applyOutputToEditor(); // real-time apply in canvas mode
+			this.updateApplyButtonState();
 		};
 
 		try {
@@ -227,7 +244,7 @@ export class LLMCanvasSidebarView extends ItemView {
 			if (!this.output.trim()) {
 				this.output = result.text ?? "";
 				await this.renderPreview();
-				this.applyOutputToEditor();
+				this.updateApplyButtonState();
 			}
 		} catch (e) {
 			new Notice(`Canvas generation failed: ${(e as Error).message}`);
@@ -235,17 +252,27 @@ export class LLMCanvasSidebarView extends ItemView {
 			this.running = false;
 			this.runBtn.disabled = false;
 			this.modelSelect.disabled = false;
-			this.runBtn.setText("Send");
+			this.runBtn.setText("Generate");
+			this.updateApplyButtonState();
 			this.refreshBeforePreview();
 		}
 	}
 
 	private getSelectedRuntime(): RuntimeModelOption {
 		const selected = resolveRuntimeModelOption(this.modelSelect?.value);
-		this.modelSelect.title = selected.transportMode === "websocket"
-			? `${selected.label} via Codex appserver`
-			: `${selected.label} | ${selected.model}`;
+		this.modelSelect.title = this.getRuntimeHintText(selected);
 		return selected;
+	}
+
+	private refreshRuntimeHint(): void {
+		const selected = this.getSelectedRuntime();
+		this.runtimeHint.textContent = this.getRuntimeHintText(selected);
+	}
+
+	private getRuntimeHintText(selected: RuntimeModelOption): string {
+		return selected.transportMode === "websocket"
+			? "Execution path: Codex appserver (WebSocket)"
+			: `Execution path: direct API (${selected.provider ?? "provider"}) ${selected.model}`;
 	}
 
 	private applyOutputToEditor(): boolean {
@@ -256,6 +283,11 @@ export class LLMCanvasSidebarView extends ItemView {
 		editor.replaceRange(this.output, startPos, endPos);
 		this.targetEndOffset = this.targetStartOffset + this.output.length;
 		return true;
+	}
+
+	private updateApplyButtonState(): void {
+		if (!this.applyBtn) return;
+		this.applyBtn.disabled = this.running || !this.output.trim();
 	}
 
 	private async renderPreview(): Promise<void> {
