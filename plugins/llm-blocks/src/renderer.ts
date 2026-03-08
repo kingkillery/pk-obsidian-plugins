@@ -1,10 +1,12 @@
-import { App, MarkdownRenderChild, MarkdownRenderer, Component } from "obsidian";
+import { App, MarkdownRenderChild, MarkdownRenderer, Notice, Component } from "obsidian";
 import { ResponseCache } from "./cache";
 import { CodexWebSocketClient } from "./websocket-client";
 import type { QueryOptions, QueryResult } from "./types";
 import {
 	buildQueryOptionsFromRuntimeOption,
-	resolveRuntimeModelOption,
+	DIRECT_RUNTIME_OPTIONS,
+	RUNTIME_MODE_OPTIONS,
+	resolveRuntimeFromMode,
 	RUNTIME_MODEL_OPTIONS,
 	type RuntimeModelOption,
 } from "./model-options";
@@ -20,10 +22,11 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 	private running = false;
 	private threadId: string | null = null;
 	private transcriptMarkdown = "";
-	private modelSelect!: HTMLSelectElement;
+	private runtimeModeSelect!: HTMLSelectElement;
+	private directModelSelect!: HTMLSelectElement;
 	private runBtn!: HTMLButtonElement;
 	private runtimeHintEl!: HTMLElement;
-	private readonly availableModels: RuntimeModelOption[] = RUNTIME_MODEL_OPTIONS;
+	private readonly availableModels: RuntimeModelOption[] = DIRECT_RUNTIME_OPTIONS;
 
 	constructor(
 		app: App,
@@ -50,24 +53,53 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		el.empty();
 		el.addClass("llm-block");
 
-		// Header bar with prompt label + button
 		const header = el.createDiv({ cls: "llm-block-header" });
-		header.createSpan({ cls: "llm-block-label", text: "LLM Prompt" });
+		header.createSpan({ cls: "llm-block-label", text: "Prompt chain" });
 		const headerActions = header.createDiv({ cls: "llm-block-header-actions" });
-		const modelWrap = headerActions.createDiv({ cls: "llm-canvas-option" });
-		modelWrap.createSpan({ text: "Execution path" });
-		this.modelSelect = modelWrap.createEl("select", { cls: "llm-block-model-select" });
-		for (const option of this.availableModels) {
-			this.modelSelect.createEl("option", { value: option.id, text: option.label });
+
+		const modeWrap = headerActions.createDiv({ cls: "llm-canvas-option" });
+		modeWrap.createSpan({ text: "Execution path" });
+		this.runtimeModeSelect = modeWrap.createEl("select", { cls: "llm-runtime-mode-select" });
+		for (const option of RUNTIME_MODE_OPTIONS) {
+			this.runtimeModeSelect.createEl("option", { value: option.value, text: option.label });
 		}
-		this.runtimeHintEl = modelWrap.createDiv({ cls: "llm-canvas-runtime-hint" });
-		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
-		this.modelSelect.addEventListener("change", () => {
-			if (this.running) return;
-			void this.syncCachedResponse();
+
+		const directWrap = headerActions.createDiv({ cls: "llm-canvas-option llm-runtime-direct-wrap" });
+		directWrap.createSpan({ text: "Model" });
+		this.directModelSelect = directWrap.createEl("select", { cls: "llm-block-model-select" });
+		for (const option of this.availableModels) {
+			this.directModelSelect.createEl("option", { value: option.id, text: option.label });
+		}
+
+		this.runtimeHintEl = modeWrap.createDiv({ cls: "llm-canvas-runtime-hint" });
+
+		const preferredId = this.client.getPreferredRuntimeModelOptionId();
+		if (this.isCodexRuntime(preferredId)) {
+			this.runtimeModeSelect.value = "codex-appserver";
+		} else {
+			this.runtimeModeSelect.value = "direct-model";
+			this.directModelSelect.value = preferredId;
+		}
+
+		const updateRuntimeSelection = (): void => {
+			if (this.runtimeModeSelect.value === "direct-model") {
+				directWrap.style.display = "inline-flex";
+			} else {
+				directWrap.style.display = "none";
+			}
+			if (!this.running) {
+				void this.syncCachedResponse();
+			}
+			this.syncRuntimeHint();
+		};
+		this.runtimeModeSelect.addEventListener("change", updateRuntimeSelection);
+		this.directModelSelect.addEventListener("change", () => {
+			if (!this.running) {
+				void this.syncCachedResponse();
+			}
 			this.syncRuntimeHint();
 		});
-		this.syncRuntimeHint();
+		updateRuntimeSelection();
 
 		this.runBtn = headerActions.createEl("button", {
 			cls: "llm-block-run-btn",
@@ -75,7 +107,6 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		});
 		this.runBtn.addEventListener("click", () => this.runPrimaryPrompt());
 
-		// Prompt display
 		const promptEl = el.createDiv({ cls: "llm-block-prompt" });
 		promptEl.createEl("pre", { text: this.prompt });
 
@@ -103,12 +134,10 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		const oldError = el.querySelector(".llm-block-error");
 		if (oldError) oldError.remove();
 
-		// Update button state
-		const btn = el.querySelector(".llm-block-run-btn") as HTMLButtonElement | null;
+		const btn = this.runBtn;
 		const addBtn = el.querySelector(".llm-followup-add-btn") as HTMLButtonElement | null;
 		const sendBtn = el.querySelector(".llm-followup-send-btn") as HTMLButtonElement | null;
 		const cancelBtn = el.querySelector(".llm-followup-cancel-btn") as HTMLButtonElement | null;
-		const modelSelect = el.querySelector(".llm-block-model-select") as HTMLSelectElement | null;
 		const input = el.querySelector(".llm-followup-input") as HTMLTextAreaElement | null;
 		if (btn) {
 			btn.disabled = true;
@@ -117,7 +146,8 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		if (addBtn) addBtn.disabled = true;
 		if (sendBtn) sendBtn.disabled = true;
 		if (cancelBtn) cancelBtn.disabled = true;
-		if (modelSelect) modelSelect.disabled = true;
+		this.runtimeModeSelect.disabled = true;
+		this.directModelSelect.disabled = true;
 		if (input) input.disabled = true;
 
 		if (!append) {
@@ -126,7 +156,6 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 			this.transcriptMarkdown = "";
 		}
 
-		// Show spinner
 		const spinner = el.createDiv({ cls: "llm-block-spinner" });
 		spinner.createSpan({ text: "Querying..." });
 
@@ -151,10 +180,9 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 			}
 
 			const turnMarkdown = this.formatTurn(trimmedPrompt, result);
-			this.transcriptMarkdown =
-				append && this.transcriptMarkdown
-					? `${this.transcriptMarkdown}\n\n---\n\n${turnMarkdown}`
-					: turnMarkdown;
+			this.transcriptMarkdown = append && this.transcriptMarkdown
+				? `${this.transcriptMarkdown}\n\n---\n\n${turnMarkdown}`
+				: turnMarkdown;
 			await this.cache.set(this.prompt, this.transcriptMarkdown, this.getRuntimeCacheVariant());
 
 			spinner.remove();
@@ -169,9 +197,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 			}
 		} catch (e) {
 			spinner.remove();
-			const errDiv = el.createDiv({ cls: "llm-block-error" });
-			errDiv.createSpan({ text: `Error: ${(e as Error).message}` });
-
+			this.renderError((e as Error).message, el);
 			if (btn) {
 				btn.disabled = false;
 				btn.setText(this.hasRun ? "Refresh" : "Start");
@@ -180,22 +206,21 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 			if (addBtn) addBtn.disabled = false;
 			if (sendBtn) sendBtn.disabled = false;
 			if (cancelBtn) cancelBtn.disabled = false;
-			if (modelSelect) modelSelect.disabled = false;
+			this.runtimeModeSelect.disabled = false;
+			this.directModelSelect.disabled = false;
 			if (input) input.disabled = false;
 			this.running = false;
 		}
 	}
 
 	private getSelectedRuntime(): RuntimeModelOption {
-		const selected = resolveRuntimeModelOption(this.modelSelect?.value);
-		this.modelSelect.title = this.getRuntimeHintText(selected);
-		return selected;
+		const mode = this.runtimeModeSelect?.value === "direct-model" ? "direct-model" : "codex-appserver";
+		return resolveRuntimeFromMode(mode, this.directModelSelect?.value);
 	}
 
 	private syncRuntimeHint(): void {
-		const selected = this.getSelectedRuntime();
 		if (this.runtimeHintEl) {
-			this.runtimeHintEl.textContent = this.getRuntimeHintText(selected);
+			this.runtimeHintEl.textContent = this.getRuntimeHintText(this.getSelectedRuntime());
 		}
 	}
 
@@ -214,6 +239,83 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 			baseUrl: selected.baseUrl ?? "",
 			model: selected.model ?? "",
 		});
+	}
+
+	private isCodexRuntime(id: string): id is "codex-appserver" {
+		return id === "codex-appserver";
+	}
+
+	private renderError(rawMessage: string, container: HTMLElement): void {
+		const message = rawMessage || "Unknown error";
+		const errDiv = container.createDiv({ cls: "llm-block-error" });
+		const errSummary = errDiv.createDiv({ cls: "llm-block-error-summary" });
+		errSummary.createSpan({ text: `Error: ${message}` });
+
+		const actionWrappers = errDiv.createDiv({ cls: "llm-block-error-actions" });
+		for (const action of this.buildErrorActions(message)) {
+			const button = actionWrappers.createEl("button", {
+				text: action.label,
+				cls: "llm-block-error-btn",
+			});
+			button.addEventListener("click", () => {
+				void action.run();
+			});
+		}
+		const details = errDiv.createDiv({ cls: "llm-block-error-detail", text: `Raw: ${message}` });
+		if (this.runBtn) {
+			this.runBtn.disabled = false;
+			this.runBtn.setText(this.hasRun ? "Refresh" : "Start");
+		}
+	}
+
+	private buildErrorActions(message: string): Array<{ label: string; run: () => Promise<void> | void }> {
+		const low = (message || "").toLowerCase();
+		const actions: Array<{ label: string; run: () => Promise<void> | void }> = [];
+
+		if (low.includes("not logged in") || low.includes("unauthenticated") || low.includes("api key")) {
+			actions.push({
+				label: "Open settings",
+				run: async () => {
+					await this.app.setting.open();
+				},
+			});
+			actions.push({
+				label: "Check API key",
+				run: () => {
+					new Notice("Paste a valid key in plugin settings and retry.");
+				},
+			});
+		}
+
+		if (low.includes("not connected") || low.includes("websocket") || low.includes("connection") || low.includes("ws")) {
+			actions.push({
+				label: "Reconnect",
+				run: () => {
+					this.client.disconnect();
+					this.client.connect();
+				},
+			});
+		}
+
+		if (low.includes("insufficient") || low.includes("balance") || low.includes("billing")) {
+			actions.push({
+				label: "Provider balance issue",
+				run: () => {
+					new Notice("Open provider console and confirm billing status before retrying.");
+				},
+			});
+		}
+
+		if (actions.length === 0) {
+			actions.push({
+				label: "Open settings",
+				run: async () => {
+					await this.app.setting.open();
+				},
+			});
+		}
+
+		return actions;
 	}
 
 	private async syncCachedResponse(): Promise<void> {
@@ -256,8 +358,6 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		summary.createSpan({ text: "Response" });
 
 		const content = details.createDiv({ cls: "llm-block-content" });
-
-		// Use Obsidian's markdown renderer for full rendering (wikilinks, callouts, etc.)
 		MarkdownRenderer.render(
 			this.app,
 			markdown,

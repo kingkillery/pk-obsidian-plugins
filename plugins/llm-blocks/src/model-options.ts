@@ -48,6 +48,29 @@ export const RUNTIME_MODEL_OPTIONS: RuntimeModelOption[] = [
 	},
 ];
 
+export const DIRECT_RUNTIME_OPTIONS: RuntimeModelOption[] = RUNTIME_MODEL_OPTIONS.filter((option) => option.transportMode === "http");
+
+export const RUNTIME_MODE_OPTIONS = [
+	{ value: "codex-appserver", label: "Codex Server" },
+	{ value: "direct-model", label: "Direct Model" },
+] as const;
+
+export function isDirectRuntimeId(id: string): id is Exclude<RuntimeModelOptionId, "codex-appserver"> {
+	return id !== "codex-appserver";
+}
+
+export function resolveRuntimeFromMode(
+	mode: "codex-appserver" | "direct-model",
+	directRuntimeId?: string,
+): RuntimeModelOption {
+	if (mode === "codex-appserver") {
+		return RUNTIME_MODEL_OPTIONS[0];
+	}
+
+	const directId = directRuntimeId ?? DIRECT_RUNTIME_OPTIONS[0]?.id;
+	return DIRECT_RUNTIME_OPTIONS.find((option) => option.id === directId) ?? DIRECT_RUNTIME_OPTIONS[0];
+}
+
 export function resolveRuntimeModelOption(id?: string): RuntimeModelOption {
 	return RUNTIME_MODEL_OPTIONS.find((option) => option.id === id) ?? RUNTIME_MODEL_OPTIONS[0];
 }

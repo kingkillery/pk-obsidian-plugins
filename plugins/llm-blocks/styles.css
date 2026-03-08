@@ -57,6 +57,14 @@
 	max-width: min(240px, 55vw);
 }
 
+.llm-runtime-direct-wrap {
+	display: inline-flex;
+}
+
+.llm-runtime-mode-select {
+	max-width: min(170px, 45vw);
+}
+
 .llm-block-run-btn:hover {
 	background-color: var(--interactive-accent-hover);
 }
@@ -195,6 +203,36 @@
 	font-size: var(--font-smaller);
 }
 
+.llm-block-error-summary {
+	font-weight: var(--font-semibold);
+}
+
+.llm-block-error-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding-top: 6px;
+}
+
+.llm-block-error-btn {
+	font-size: var(--font-smaller);
+	border-radius: var(--radius-s);
+	padding: 4px 10px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+.llm-block-error-btn:hover {
+	background: var(--background-modifier-hover);
+}
+
+.llm-block-error-detail {
+	color: var(--text-faint);
+	padding-top: 4px;
+}
+
 /* Settings status dot */
 .llm-dot {
 	display: inline-block;
@@ -239,6 +277,21 @@
 	line-height: 1.25;
 }
 
+.llm-binding-active,
+.llm-binding-stale {
+	font-weight: var(--font-semibold);
+}
+
+.llm-binding-stale {
+	background: rgba(248, 113, 113, 0.15) !important;
+	color: var(--text-error) !important;
+}
+
+.llm-binding-active {
+	background: rgba(74, 222, 128, 0.15) !important;
+	color: var(--text-success) !important;
+}
+
 .llm-canvas {
 	display: flex;
 	flex-direction: column;
@@ -253,6 +306,12 @@
 
 .llm-canvas-label {
 	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.llm-canvas-diff-label {
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
 	color: var(--text-muted);
 }
 

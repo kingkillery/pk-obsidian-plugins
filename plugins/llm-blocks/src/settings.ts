@@ -116,15 +116,87 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 		}
 
 		const showAdvanced = this.plugin.settings.showAdvancedSettings;
+		const isServerRuntime = this.plugin.settings.transportMode !== "http";
 
-		// Keep core workflow settings visible by default
-		containerEl.createEl("h3", { text: "Connection" });
+		containerEl.createEl("h3", { text: "Runtime" });
 		new Setting(containerEl)
-			.setName("API connection status")
-			.setDesc("The status area above shows WebSocket/auth health and active custom model.");
+			.setName("Preferred runtime")
+			.setDesc("Choose the default execution path. Advanced transport mode is in advanced settings.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("codex", "Codex Server")
+					.addOption("direct", "Direct Model")
+					.setValue(isServerRuntime ? "codex" : "direct")
+					.onChange(async (value) => {
+						this.plugin.settings.transportMode = value === "direct" ? "http" : "auto";
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
 
-		containerEl.createEl("h3", { text: "Model" });
+		containerEl.createEl("h3", { text: "Authentication" });
+		new Setting(containerEl)
+			.setName("Default API key")
+			.setDesc("Used for direct API mode when no per-provider key is set")
+			.addText((text) => {
+				text
+					.setPlaceholder("sk-...")
+					.setValue(this.plugin.settings.apiKey)
+					.onChange(async (value) => {
+						this.plugin.settings.apiKey = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "password";
+			});
 
+		new Setting(containerEl)
+			.setName("Sign in with ChatGPT")
+			.setDesc("Required when using Codex server transport on some accounts.")
+			.addButton((btn) =>
+				btn.setButtonText("Login with ChatGPT").setCta().onClick(async () => {
+					btn.setDisabled(true);
+					btn.setButtonText("Opening...");
+					try {
+						const url = await this.plugin.wsClient.loginChatGPT();
+						window.open(url);
+						btn.setButtonText("Waiting for login...");
+					} catch (error) {
+						btn.setButtonText("Login failed - retry");
+						btn.setDisabled(false);
+						new Notice(error instanceof Error ? error.message : String(error));
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Show advanced settings")
+			.setDesc("Show transport details, custom profiles, model/provider overrides, and key mapping.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(showAdvanced)
+					.onChange(async (value) => {
+						this.plugin.settings.showAdvancedSettings = value;
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			);
+
+		containerEl.createEl("h3", { text: "Cache" });
+		new Setting(containerEl)
+			.setName("Clear response cache")
+			.setDesc(`${this.plugin.cache.size} cached responses`)
+			.addButton((btn) =>
+				btn.setButtonText("Clear cache").onClick(() => {
+					this.plugin.cache.clear();
+					this.display();
+				})
+			);
+
+		if (!showAdvanced) return;
+
+		containerEl.createEl("h3", { text: "Advanced" });
+
+		containerEl.createEl("h4", { text: "Model and provider defaults" });
 		new Setting(containerEl)
 			.setName("Default runtime provider")
 			.setDesc("Used for direct API mode when no active custom model is selected")
@@ -142,7 +214,7 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Default base URL")
-			.setDesc("Examples: https://api.openai.com or https://api.minimax.io/anthropic")
+			.setDesc("Examples: https://api.openai.com or https://api.minimax.io")
 			.addText((text) =>
 				text
 					.setPlaceholder("https://api.openai.com")
@@ -150,12 +222,12 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.baseUrl = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Default model")
-			.setDesc("Used for direct mode when no active custom model is selected")
+			.setDesc("Used for direct model mode when no active custom model is selected")
 			.addText((text) =>
 				text
 					.setPlaceholder("gpt-4.1-mini")
@@ -163,7 +235,7 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.model = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -193,7 +265,7 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.temperature = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		const selectedPresetByModel =
@@ -212,7 +284,6 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 						const preset = MODEL_PRESETS.find((item) => item.id === value);
 						if (!preset) return;
 						this.plugin.settings.model = preset.model;
-						this.plugin.settings.provider = "openai";
 						if (typeof preset.temperature === "number") {
 							this.plugin.settings.temperature = preset.temperature;
 						}
@@ -221,21 +292,7 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					});
 			});
 
-		containerEl.createEl("h3", { text: "Authentication" });
-		new Setting(containerEl)
-			.setName("Default API key")
-			.setDesc("Used for direct HTTP API mode when no per-provider key is set")
-			.addText((text) => {
-				text
-					.setPlaceholder("sk-...")
-					.setValue(this.plugin.settings.apiKey)
-					.onChange(async (value) => {
-						this.plugin.settings.apiKey = value;
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.type = "password";
-			});
-
+		containerEl.createEl("h4", { text: "Per-provider API keys" });
 		for (const field of PROVIDER_KEY_FIELDS) {
 			new Setting(containerEl)
 				.setName(field.name)
@@ -255,38 +312,10 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 				});
 		}
 
-		new Setting(containerEl)
-			.setName("Show advanced settings")
-			.setDesc("Use advanced settings only for transport control, custom models, and auth overrides.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(showAdvanced)
-					.onChange(async (value) => {
-						this.plugin.settings.showAdvancedSettings = value;
-						await this.plugin.saveSettings();
-						this.display();
-					})
-			);
-
-		containerEl.createEl("h3", { text: "Cache" });
-		new Setting(containerEl)
-			.setName("Clear response cache")
-			.setDesc(`${this.plugin.cache.size} cached responses`)
-			.addButton((btn) =>
-				btn.setButtonText("Clear cache").onClick(() => {
-					this.plugin.cache.clear();
-					this.display();
-				})
-			);
-
-		if (!showAdvanced) return;
-
-		containerEl.createEl("h3", { text: "Advanced" });
-
 		containerEl.createEl("h4", { text: "Connection and transport" });
 		new Setting(containerEl)
 			.setName("Transport mode")
-			.setDesc("How the plugin sends requests: direct API or Codex server.")
+			.setDesc("How requests are sent: auto, websocket only, or direct HTTP only")
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("auto", "Auto (WebSocket preferred)")
@@ -296,13 +325,12 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.transportMode = value as "auto" | "websocket" | "http";
 						await this.plugin.saveSettings();
-						this.display();
 					})
 			);
 
 		new Setting(containerEl)
 			.setName("WebSocket endpoint")
-			.setDesc("Codex app-server WebSocket endpoint")
+			.setDesc("Codex appserver WebSocket endpoint")
 			.addText((text) =>
 				text
 					.setPlaceholder("ws://127.0.0.1:4500")
@@ -322,7 +350,7 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.autoReconnect = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -333,7 +361,7 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					this.plugin.wsClient.disconnect();
 					this.plugin.wsClient.connect();
 					setTimeout(() => this.display(), 1500);
-				})
+				}),
 			);
 
 		containerEl.createEl("h4", { text: "Custom model profiles" });
@@ -375,31 +403,5 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 						this.display();
 					});
 			});
-
-		if (
-			this.plugin.settings.transportMode !== "http" &&
-			authState === "unauthenticated" &&
-			connState === "connected" &&
-			!this.plugin.settings.apiKey.trim() &&
-			!usingCustomModel
-		) {
-			new Setting(containerEl)
-				.setName("Login with ChatGPT")
-				.setDesc("Opens a browser window to authenticate with your ChatGPT account")
-				.addButton((btn) =>
-					btn.setButtonText("Login with ChatGPT").setCta().onClick(async () => {
-						btn.setDisabled(true);
-						btn.setButtonText("Opening browser...");
-						try {
-							const url = await this.plugin.wsClient.loginChatGPT();
-							window.open(url);
-							btn.setButtonText("Waiting for login...");
-						} catch (e) {
-							btn.setButtonText("Login failed - retry");
-							btn.setDisabled(false);
-						}
-					})
-				);
-		}
 	}
 }
