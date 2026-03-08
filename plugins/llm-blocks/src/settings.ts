@@ -58,7 +58,7 @@ const DIRECT_PROVIDER_OPTIONS: Array<{ value: LLMProvider; label: string }> = [
 
 const PROVIDER_KEY_FIELDS: Array<{ provider: LLMProvider; name: string; placeholder: string }> = [
 	{ provider: "anthropic", name: "Anthropic API key", placeholder: "sk-ant-..." },
-	{ provider: "openrouter", name: "OpenRouter API key", placeholder: "sk-or-..." },
+	{ provider: "openrouter", name: "OpenRouter API key", placeholder: "sk-or-v1-..." },
 	{ provider: "minimax", name: "MiniMax API key", placeholder: "sk-..." },
 	{ provider: "zai", name: "Z.AI API key", placeholder: "..." },
 ];

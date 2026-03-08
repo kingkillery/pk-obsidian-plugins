@@ -196,8 +196,21 @@ export class CodexWebSocketClient extends Events {
 
 	private async queryViaDirectApi(prompt: string, cfg: DirectConfig, options?: QueryOptions): Promise<QueryResult> {
 		const effectiveCfg = options?.model ? { ...cfg, model: options.model } : cfg;
-		if (!cfg.apiKey.trim()) {
+		const apiKey = cfg.apiKey.trim();
+		if (!apiKey) {
 			throw new Error("Missing API key for active direct model.");
+		}
+		if (effectiveCfg.provider === "openrouter") {
+			if (/^sk-proj-/i.test(apiKey)) {
+				throw new Error(
+					"Configured OpenRouter key starts with 'sk-proj-', which looks like an OpenAI project key. Use an OpenRouter API key from openrouter.ai/keys instead.",
+				);
+			}
+			if (!/^sk-or(?:-v1)?-/i.test(apiKey)) {
+				throw new Error(
+					"Configured OpenRouter key does not look like an OpenRouter API key. Create one at openrouter.ai/keys and paste it into the OpenRouter field.",
+				);
+			}
 		}
 		if (effectiveCfg.provider === "anthropic") {
 			return this.queryViaAnthropicCompatible(prompt, effectiveCfg, options);
@@ -213,6 +226,7 @@ export class CodexWebSocketClient extends Events {
 		};
 		if (this.isOpenRouterBase(cfg.baseUrl)) {
 			headers["HTTP-Referer"] = "https://obsidian.md";
+			headers["X-OpenRouter-Title"] = "LLM Blocks";
 			headers["X-Title"] = "LLM Blocks";
 		}
 
@@ -765,7 +779,7 @@ export class CodexWebSocketClient extends Events {
 		const p = payload as Record<string, unknown>;
 
 		if (typeof p.output_text === "string" && p.output_text.trim()) {
-			return p.output_text.trim();
+			return this.normalizeDirectText(p.output_text);
 		}
 
 		if (Array.isArray(p.output)) {
@@ -785,7 +799,7 @@ export class CodexWebSocketClient extends Events {
 				})
 				.join("")
 				.trim();
-			if (text) return text;
+			if (text) return this.normalizeDirectText(text);
 		}
 
 		if (Array.isArray(p.content)) {
@@ -801,7 +815,7 @@ export class CodexWebSocketClient extends Events {
 				})
 				.join("")
 				.trim();
-			if (text) return text;
+			if (text) return this.normalizeDirectText(text);
 		}
 
 		if (Array.isArray(p.choices)) {
@@ -823,10 +837,14 @@ export class CodexWebSocketClient extends Events {
 				})
 				.join("")
 				.trim();
-			if (text) return text;
+			if (text) return this.normalizeDirectText(text);
 		}
 
 		return "";
+	}
+
+	private normalizeDirectText(text: string): string {
+		return text.replace(/<think>[\s\S]*?<\/think>\s*/gi, "").trim();
 	}
 
 	private resolveModelName(...candidates: Array<string | undefined>): string {

@@ -40,7 +40,7 @@ export const RUNTIME_MODEL_OPTIONS: RuntimeModelOption[] = [
 	},
 	{
 		id: "openrouter-mercury-2",
-		label: "OpenRouter",
+		label: "OpenRouter-mercury-2",
 		model: "inception/mercury-2",
 		transportMode: "http",
 		provider: "openrouter",
