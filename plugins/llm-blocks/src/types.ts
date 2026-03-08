@@ -1,5 +1,7 @@
-export type LLMProvider = "openai" | "anthropic";
+export type LLMProvider = "openai" | "anthropic" | "openrouter" | "minimax" | "zai";
 export type TransportMode = "auto" | "websocket" | "http";
+
+export type ProviderApiKeys = Partial<Record<LLMProvider, string>>;
 
 export interface CustomModelConfig {
 	id: string;
@@ -22,6 +24,7 @@ export interface LLMBlocksSettings {
 	autoReconnect: boolean;
 	maxReconnectAttempts: number;
 	apiKey: string;
+	providerApiKeys: ProviderApiKeys;
 	customModelsJson: string;
 	activeModelId: string;
 }
@@ -37,6 +40,7 @@ export const DEFAULT_SETTINGS: LLMBlocksSettings = {
 	autoReconnect: true,
 	maxReconnectAttempts: 0,
 	apiKey: "",
+	providerApiKeys: {},
 	customModelsJson: "",
 	activeModelId: "",
 };
@@ -70,4 +74,14 @@ export interface QueryResult {
 	text: string;
 	model: string;
 	threadId?: string;
+}
+
+export interface QueryOptions {
+	threadId?: string;
+	model?: string;
+	transportModeOverride?: TransportMode;
+	providerOverride?: LLMProvider;
+	baseUrlOverride?: string;
+	apiKeyOverride?: string;
+	onDelta?: (delta: string) => void;
 }

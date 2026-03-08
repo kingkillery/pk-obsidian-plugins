@@ -1,7 +1,13 @@
 import { App, MarkdownRenderChild, MarkdownRenderer, Component } from "obsidian";
 import { ResponseCache } from "./cache";
 import { CodexWebSocketClient } from "./websocket-client";
-import type { QueryResult } from "./types";
+import type { QueryOptions, QueryResult } from "./types";
+import {
+	buildQueryOptionsFromRuntimeOption,
+	resolveRuntimeModelOption,
+	RUNTIME_MODEL_OPTIONS,
+	type RuntimeModelOption,
+} from "./model-options";
 
 export class LLMBlockRenderer extends MarkdownRenderChild {
 	private static sharedThreadBySourcePath = new Map<string, string>();
@@ -14,6 +20,8 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 	private running = false;
 	private threadId: string | null = null;
 	private transcriptMarkdown = "";
+	private modelSelect!: HTMLSelectElement;
+	private readonly availableModels: RuntimeModelOption[] = RUNTIME_MODEL_OPTIONS;
 
 	constructor(
 		app: App,
@@ -43,12 +51,18 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		// Header bar with prompt label + button
 		const header = el.createDiv({ cls: "llm-block-header" });
 		header.createSpan({ cls: "llm-block-label", text: "LLM Prompt" });
+		const headerActions = header.createDiv({ cls: "llm-block-header-actions" });
+		const modelWrap = headerActions.createDiv({ cls: "llm-canvas-option" });
+		modelWrap.createSpan({ text: "Provider" });
+		this.modelSelect = modelWrap.createEl("select", { cls: "llm-block-model-select" });
+		for (const option of this.availableModels) {
+			this.modelSelect.createEl("option", { value: option.id, text: option.label });
+		}
+		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
 
-		const cached = await this.cache.get(this.prompt);
-
-		const btn = header.createEl("button", {
+		const btn = headerActions.createEl("button", {
 			cls: "llm-block-run-btn",
-			text: cached ? "Refresh" : "Run",
+			text: "Start",
 		});
 		btn.addEventListener("click", () => this.runPrimaryPrompt());
 
@@ -56,8 +70,16 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		const promptEl = el.createDiv({ cls: "llm-block-prompt" });
 		promptEl.createEl("pre", { text: this.prompt });
 
+		let cached = undefined;
+		try {
+			cached = await this.cache.get(this.prompt);
+		} catch (error) {
+			console.warn("LLM Blocks: failed to read cached response", error);
+		}
+
 		// Response area
 		if (cached) {
+			btn.setText("Refresh");
 			this.hasRun = true;
 			this.transcriptMarkdown = cached.markdown;
 			this.renderResponse(el, this.transcriptMarkdown);
@@ -89,6 +111,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		const addBtn = el.querySelector(".llm-followup-add-btn") as HTMLButtonElement | null;
 		const sendBtn = el.querySelector(".llm-followup-send-btn") as HTMLButtonElement | null;
 		const cancelBtn = el.querySelector(".llm-followup-cancel-btn") as HTMLButtonElement | null;
+		const modelSelect = el.querySelector(".llm-block-model-select") as HTMLSelectElement | null;
 		const input = el.querySelector(".llm-followup-input") as HTMLTextAreaElement | null;
 		if (btn) {
 			btn.disabled = true;
@@ -97,6 +120,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		if (addBtn) addBtn.disabled = true;
 		if (sendBtn) sendBtn.disabled = true;
 		if (cancelBtn) cancelBtn.disabled = true;
+		if (modelSelect) modelSelect.disabled = true;
 		if (input) input.disabled = true;
 
 		if (!append) {
@@ -115,7 +139,14 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 				if (sharedThread) this.threadId = sharedThread;
 			}
 
-			const result = await this.client.query(trimmedPrompt, this.threadId ? { threadId: this.threadId } : undefined);
+			const selectedRuntime = this.getSelectedRuntime();
+			const queryOptions: QueryOptions = {
+				...buildQueryOptionsFromRuntimeOption(selectedRuntime),
+			};
+			if (this.threadId) {
+				queryOptions.threadId = this.threadId;
+			}
+			const result = await this.client.query(trimmedPrompt, queryOptions);
 			const resolvedThreadId = (result.threadId ?? this.threadId ?? "").trim();
 			if (resolvedThreadId) {
 				this.threadId = resolvedThreadId;
@@ -146,15 +177,24 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 
 			if (btn) {
 				btn.disabled = false;
-				btn.setText(this.hasRun ? "Refresh" : "Run");
+				btn.setText(this.hasRun ? "Refresh" : "Start");
 			}
 		} finally {
 			if (addBtn) addBtn.disabled = false;
 			if (sendBtn) sendBtn.disabled = false;
 			if (cancelBtn) cancelBtn.disabled = false;
+			if (modelSelect) modelSelect.disabled = false;
 			if (input) input.disabled = false;
 			this.running = false;
 		}
+	}
+
+	private getSelectedRuntime(): RuntimeModelOption {
+		const selected = resolveRuntimeModelOption(this.modelSelect?.value);
+		this.modelSelect.title = selected.transportMode === "websocket"
+			? `${selected.label} via Codex appserver`
+			: `${selected.label} | ${selected.model}`;
+		return selected;
 	}
 
 	private formatTurn(userPrompt: string, result: QueryResult): string {

@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type LLMBlocksPlugin from "./main";
-import type { CustomModelConfig } from "./types";
+import type { CustomModelConfig, LLMProvider } from "./types";
 
 interface ModelPreset {
 	id: string;
@@ -46,6 +46,21 @@ const MODEL_PRESETS: ModelPreset[] = [
 		model: "gemini-3-pro-preview",
 		temperature: 1.0,
 	},
+];
+
+const DIRECT_PROVIDER_OPTIONS: Array<{ value: LLMProvider; label: string }> = [
+	{ value: "openai", label: "OpenAI-compatible" },
+	{ value: "anthropic", label: "Anthropic-compatible" },
+	{ value: "openrouter", label: "OpenRouter" },
+	{ value: "minimax", label: "MiniMax" },
+	{ value: "zai", label: "Z.AI" },
+];
+
+const PROVIDER_KEY_FIELDS: Array<{ provider: LLMProvider; name: string; placeholder: string }> = [
+	{ provider: "anthropic", name: "Anthropic API key", placeholder: "sk-ant-..." },
+	{ provider: "openrouter", name: "OpenRouter API key", placeholder: "sk-or-..." },
+	{ provider: "minimax", name: "MiniMax API key", placeholder: "sk-..." },
+	{ provider: "zai", name: "Z.AI API key", placeholder: "..." },
 ];
 
 function parseCustomModels(raw: string): CustomModelConfig[] {
@@ -216,6 +231,25 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 				text.inputEl.type = "password";
 			});
 
+		for (const field of PROVIDER_KEY_FIELDS) {
+			new Setting(containerEl)
+				.setName(field.name)
+				.setDesc(`Used when provider/model routing targets ${field.provider}`)
+				.addText((text) => {
+					text
+						.setPlaceholder(field.placeholder)
+						.setValue(this.plugin.settings.providerApiKeys?.[field.provider] ?? "")
+						.onChange(async (value) => {
+							this.plugin.settings.providerApiKeys = {
+								...(this.plugin.settings.providerApiKeys ?? {}),
+								[field.provider]: value,
+							};
+							await this.plugin.saveSettings();
+						});
+					text.inputEl.type = "password";
+				});
+		}
+
 		if (
 			this.plugin.settings.transportMode !== "http" &&
 			authState === "unauthenticated" &&
@@ -276,14 +310,17 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 			.setName("Default provider")
 			.setDesc("Direct API provider used when no active custom model is selected")
 			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("openai", "OpenAI-compatible")
-					.addOption("anthropic", "Anthropic-compatible")
-					.setValue(this.plugin.settings.provider)
-					.onChange(async (value) => {
-						this.plugin.settings.provider = value as "openai" | "anthropic";
-						await this.plugin.saveSettings();
-					})
+				{
+					for (const option of DIRECT_PROVIDER_OPTIONS) {
+						dropdown.addOption(option.value, option.label);
+					}
+					return dropdown
+						.setValue(this.plugin.settings.provider)
+						.onChange(async (value) => {
+							this.plugin.settings.provider = value as LLMProvider;
+							await this.plugin.saveSettings();
+						});
+				}
 			);
 
 		new Setting(containerEl)

@@ -25,7 +25,11 @@ const RESOURCE_FILES = [
 	"memory-consolidation-workflow.md",
 	"nlm-cli-cheatsheet.md",
 	"notebooklm-cli-resource-hub.md",
+	"shared-notebook-intake.md",
 ] as const;
+
+const SHARED_NOTEBOOK_URL =
+	"https://notebooklm.google.com/notebook/98b3a4e9-b830-4631-88a7-22018ba0aaad";
 
 export default class OptimizedLearningPlugin extends Plugin {
 	settings: OptimizedLearningSettings = DEFAULT_SETTINGS;
@@ -64,6 +68,14 @@ export default class OptimizedLearningPlugin extends Plugin {
 			name: "Capture NotebookLM AI reference",
 			callback: async () => {
 				await this.captureAiReference();
+			},
+		});
+
+		this.addCommand({
+			id: "create-shared-notebook-intake-note",
+			name: "Create shared NotebookLM intake note",
+			callback: async () => {
+				await this.createSharedNotebookIntakeNote();
 			},
 		});
 	}
@@ -168,6 +180,26 @@ export default class OptimizedLearningPlugin extends Plugin {
 		} catch (error) {
 			new Notice(this.formatCliError("NotebookLM AI reference capture failed", error), 10000);
 		}
+	}
+
+	private async createSharedNotebookIntakeNote(): Promise<void> {
+		const folderPath = normalizePath(this.settings.resourceFolder);
+		await this.ensureFolder(folderPath);
+		const targetPath = normalizePath(`${folderPath}/Shared NotebookLM Intake.md`);
+		const template = await this.readBundledResource("shared-notebook-intake.md");
+		const body = template.replace(/{{SHARED_NOTEBOOK_URL}}/g, SHARED_NOTEBOOK_URL);
+
+		const existing = this.app.vault.getAbstractFileByPath(targetPath);
+		if (existing instanceof TFile) {
+			await this.app.vault.modify(existing, body);
+			await this.app.workspace.getLeaf(true).openFile(existing);
+			new Notice("Updated shared NotebookLM intake note.", 6000);
+			return;
+		}
+
+		const file = await this.app.vault.create(targetPath, body);
+		await this.app.workspace.getLeaf(true).openFile(file);
+		new Notice("Created shared NotebookLM intake note.", 6000);
 	}
 
 	private async readBundledResource(fileName: typeof RESOURCE_FILES[number]): Promise<string> {

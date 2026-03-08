@@ -1,5 +1,11 @@
 import { App, EditorPosition, MarkdownRenderer, MarkdownView, Modal, Notice } from "obsidian";
 import { CodexWebSocketClient } from "./websocket-client";
+import {
+	buildQueryOptionsFromRuntimeOption,
+	resolveRuntimeModelOption,
+	RUNTIME_MODEL_OPTIONS,
+	type RuntimeModelOption,
+} from "./model-options";
 
 type ReplaceScope = "selection" | "note";
 const INLINE_REPLACEMENT_MODEL = "gemini-3.1-flash-lite-preview";
@@ -16,12 +22,14 @@ export class LLMCanvasModal extends Modal {
 	private applyBtn!: HTMLButtonElement;
 	private liveApplyToggle!: HTMLInputElement;
 	private scopeSelect!: HTMLSelectElement;
+	private modelSelect!: HTMLSelectElement;
 	private running = false;
 	private output = "";
 	private targetStartOffset = 0;
 	private targetEndOffset = 0;
 	private sourcePath = "";
 	private readonly options: LLMCanvasModalOptions;
+	private readonly availableModels: RuntimeModelOption[] = RUNTIME_MODEL_OPTIONS;
 
 	constructor(app: App, private client: CodexWebSocketClient, options?: LLMCanvasModalOptions) {
 		super(app);
@@ -57,6 +65,14 @@ export class LLMCanvasModal extends Modal {
 		this.scopeSelect.createEl("option", { value: "selection", text: "Selection" });
 		this.scopeSelect.createEl("option", { value: "note", text: "Whole note" });
 		this.scopeSelect.value = this.options.initialScope ?? "selection";
+
+		const modelWrap = optionsRow.createDiv({ cls: "llm-canvas-option" });
+		modelWrap.createSpan({ text: "Provider" });
+		this.modelSelect = modelWrap.createEl("select");
+		for (const option of this.availableModels) {
+			this.modelSelect.createEl("option", { value: option.id, text: option.label });
+		}
+		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
 
 		const liveWrap = optionsRow.createDiv({ cls: "llm-canvas-option" });
 		this.liveApplyToggle = liveWrap.createEl("input", { type: "checkbox" });
@@ -133,6 +149,11 @@ export class LLMCanvasModal extends Modal {
 		addBtn.addEventListener("click", () => {
 			this.promptInput.focus();
 		});
+		this.modelSelect = bar.createEl("select", { cls: "llm-block-model-select" });
+		for (const option of this.availableModels) {
+			this.modelSelect.createEl("option", { value: option.id, text: option.label });
+		}
+		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
 		this.promptInput = bar.createEl("input", {
 			cls: "llm-canvas-inline-input",
 			type: "text",
@@ -247,11 +268,14 @@ export class LLMCanvasModal extends Modal {
 
 		this.running = true;
 		this.runBtn.disabled = true;
+		this.modelSelect.disabled = true;
 		this.runBtn.setText(this.options.inlineMode ? "Sending..." : "Generating...");
 		this.output = "";
 		this.outputRaw.value = "";
 		this.outputPreview.empty();
 
+		const selectedRuntime = this.getSelectedRuntime();
+		const runtimeQueryOptions = buildQueryOptionsFromRuntimeOption(selectedRuntime);
 		const prompt = this.buildPrompt(instruction, context.source);
 		const onDelta = (delta: string) => {
 			this.output += delta;
@@ -263,9 +287,12 @@ export class LLMCanvasModal extends Modal {
 		};
 
 		try {
-			this.client.on("delta", onDelta);
 			const result = await this.client.query(prompt, {
-				model: context.scope === "selection" ? INLINE_REPLACEMENT_MODEL : undefined,
+				...runtimeQueryOptions,
+				model: context.scope === "selection" && selectedRuntime.transportMode === "websocket"
+					? INLINE_REPLACEMENT_MODEL
+					: runtimeQueryOptions.model,
+				onDelta,
 			});
 			if (!this.output.trim()) {
 				this.output = result.text ?? "";
@@ -275,11 +302,19 @@ export class LLMCanvasModal extends Modal {
 		} catch (e) {
 			new Notice(`Canvas generation failed: ${(e as Error).message}`);
 		} finally {
-			this.client.off("delta", onDelta);
 			this.running = false;
 			this.runBtn.disabled = false;
+			this.modelSelect.disabled = false;
 			this.runBtn.setText(this.options.inlineMode ? "Send" : "Generate");
 		}
+	}
+
+	private getSelectedRuntime(): RuntimeModelOption {
+		const selected = resolveRuntimeModelOption(this.modelSelect?.value);
+		this.modelSelect.title = selected.transportMode === "websocket"
+			? `${selected.label} via Codex appserver`
+			: `${selected.label} | ${selected.model}`;
+		return selected;
 	}
 
 	private applyOutputToEditor(): boolean {

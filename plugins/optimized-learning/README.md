@@ -8,6 +8,7 @@ Current focus:
 - create study-session notes from a template
 - validate a local `nlm` install
 - capture `nlm --ai` output into an Obsidian note for future agent workflows
+- create a fallback intake note for a shared NotebookLM notebook when direct CLI access is blocked
 
 ## Local NotebookLM CLI
 
@@ -23,6 +24,7 @@ The plugin defaults to that path, but you can change it in settings.
 - `Optimized Learning: Create study session note`
 - `Optimized Learning: Check NotebookLM CLI`
 - `Optimized Learning: Capture NotebookLM AI reference`
+- `Optimized Learning: Create shared NotebookLM intake note`
 
 ## Resource pack
 

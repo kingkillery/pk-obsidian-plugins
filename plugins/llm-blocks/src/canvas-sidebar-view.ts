@@ -1,5 +1,11 @@
 import { ItemView, MarkdownRenderer, MarkdownView, Notice, WorkspaceLeaf } from "obsidian";
 import { CodexWebSocketClient } from "./websocket-client";
+import {
+	buildQueryOptionsFromRuntimeOption,
+	resolveRuntimeModelOption,
+	RUNTIME_MODEL_OPTIONS,
+	type RuntimeModelOption,
+} from "./model-options";
 
 export const CANVAS_VIEW_TYPE = "llm-canvas-view";
 const INLINE_REPLACEMENT_MODEL = "gemini-3.1-flash-lite-preview";
@@ -10,6 +16,7 @@ export class LLMCanvasSidebarView extends ItemView {
 	private promptInput!: HTMLInputElement;
 	private runBtn!: HTMLButtonElement;
 	private applyBtn!: HTMLButtonElement;
+	private modelSelect!: HTMLSelectElement;
 	private outputPreview!: HTMLElement;
 	private beforePreview!: HTMLElement;
 	private fileBadge!: HTMLElement;
@@ -21,7 +28,7 @@ export class LLMCanvasSidebarView extends ItemView {
 	private targetEndOffset = 0;
 	private output = "";
 	private running = false;
-	private activeDeltaHandler: ((delta: string) => void) | null = null;
+	private readonly availableModels: RuntimeModelOption[] = RUNTIME_MODEL_OPTIONS;
 
 	constructor(leaf: WorkspaceLeaf, private client: CodexWebSocketClient) {
 		super(leaf);
@@ -50,10 +57,7 @@ export class LLMCanvasSidebarView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
-		if (this.activeDeltaHandler) {
-			this.client.off("delta", this.activeDeltaHandler);
-			this.activeDeltaHandler = null;
-		}
+		return;
 	}
 
 	private buildUi(): void {
@@ -87,6 +91,11 @@ export class LLMCanvasSidebarView extends ItemView {
 		const bar = contentEl.createDiv({ cls: "llm-canvas-inline-bar" });
 		const addBtn = bar.createEl("button", { cls: "llm-canvas-inline-icon", text: "+" });
 		addBtn.addEventListener("click", () => this.promptInput.focus());
+		this.modelSelect = bar.createEl("select", { cls: "llm-block-model-select" });
+		for (const option of this.availableModels) {
+			this.modelSelect.createEl("option", { value: option.id, text: option.label });
+		}
+		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
 		this.promptInput = bar.createEl("input", {
 			cls: "llm-canvas-inline-input",
 			type: "text",
@@ -184,6 +193,7 @@ export class LLMCanvasSidebarView extends ItemView {
 
 		this.refreshBeforePreview();
 		const current = editor.getValue().slice(this.targetStartOffset, this.targetEndOffset);
+		const selectedRuntime = this.getSelectedRuntime();
 		const prompt = [
 			instruction,
 			"",
@@ -195,6 +205,7 @@ export class LLMCanvasSidebarView extends ItemView {
 
 		this.running = true;
 		this.runBtn.disabled = true;
+		this.modelSelect.disabled = true;
 		this.runBtn.setText("Sending...");
 		this.output = "";
 		this.outputPreview.empty();
@@ -206,10 +217,12 @@ export class LLMCanvasSidebarView extends ItemView {
 		};
 
 		try {
-			this.activeDeltaHandler = onDelta;
-			this.client.on("delta", onDelta);
 			const result = await this.client.query(prompt, {
-				model: this.scope === "selection" ? INLINE_REPLACEMENT_MODEL : undefined,
+				...buildQueryOptionsFromRuntimeOption(selectedRuntime),
+				model: this.scope === "selection" && selectedRuntime.transportMode === "websocket"
+					? INLINE_REPLACEMENT_MODEL
+					: buildQueryOptionsFromRuntimeOption(selectedRuntime).model,
+				onDelta,
 			});
 			if (!this.output.trim()) {
 				this.output = result.text ?? "";
@@ -219,15 +232,20 @@ export class LLMCanvasSidebarView extends ItemView {
 		} catch (e) {
 			new Notice(`Canvas generation failed: ${(e as Error).message}`);
 		} finally {
-			if (this.activeDeltaHandler) {
-				this.client.off("delta", this.activeDeltaHandler);
-				this.activeDeltaHandler = null;
-			}
 			this.running = false;
 			this.runBtn.disabled = false;
+			this.modelSelect.disabled = false;
 			this.runBtn.setText("Send");
 			this.refreshBeforePreview();
 		}
+	}
+
+	private getSelectedRuntime(): RuntimeModelOption {
+		const selected = resolveRuntimeModelOption(this.modelSelect?.value);
+		this.modelSelect.title = selected.transportMode === "websocket"
+			? `${selected.label} via Codex appserver`
+			: `${selected.label} | ${selected.model}`;
+		return selected;
 	}
 
 	private applyOutputToEditor(): boolean {

@@ -7,15 +7,18 @@ import {
 	JsonRpcResponse,
 	LLMBlocksSettings,
 	LLMProvider,
+	QueryOptions,
 	QueryResult,
 } from "./types";
 import { NodeWebSocket } from "./node-websocket";
+import { resolveRuntimeModelIdFromSettings, type RuntimeModelOptionId } from "./model-options";
 
 interface ActiveTurn {
 	resolve: (result: QueryResult) => void;
 	reject: (e: Error) => void;
 	chunks: string[];
 	modelHint: string;
+	onDelta?: (delta: string) => void;
 }
 
 interface DirectConfig {
@@ -24,11 +27,6 @@ interface DirectConfig {
 	apiKey: string;
 	model: string;
 	maxOutputTokens: number;
-}
-
-interface QueryOptions {
-	threadId?: string;
-	model?: string;
 }
 
 export class CodexWebSocketClient extends Events {
@@ -50,6 +48,9 @@ export class CodexWebSocketClient extends Events {
 	get connectionState(): ConnectionState { return this.state; }
 	get authState(): AuthState { return this.auth; }
 	get lastErrorMessage(): string { return this.lastError; }
+	getPreferredRuntimeModelOptionId(): RuntimeModelOptionId {
+		return resolveRuntimeModelIdFromSettings(this.settings);
+	}
 
 	get isReady(): boolean {
 		return this.state === "connected" && this.sessionReady && this.auth === "authenticated";
@@ -123,9 +124,10 @@ export class CodexWebSocketClient extends Events {
 	}
 
 	async query(prompt: string, options?: QueryOptions): Promise<QueryResult> {
-		const direct = this.getDirectConfig();
+		const direct = this.getDirectConfig(options);
+		const transportMode = options?.transportModeOverride ?? this.settings.transportMode;
 
-		if (this.settings.transportMode === "http") {
+		if (transportMode === "http") {
 			if (!direct) {
 				throw new Error("HTTP mode requires a configured model.");
 			}
@@ -136,7 +138,7 @@ export class CodexWebSocketClient extends Events {
 			return this.queryViaWebSocket(prompt, options);
 		}
 
-		if (this.settings.transportMode === "auto" && direct) {
+		if (transportMode === "auto" && direct) {
 			return this.queryViaDirectApi(prompt, direct, options);
 		}
 
@@ -164,7 +166,13 @@ export class CodexWebSocketClient extends Events {
 		}
 
 		const turnPromise = new Promise<QueryResult>((resolve, reject) => {
-			this.activeTurns.set(threadId, { resolve, reject, chunks: [], modelHint });
+			this.activeTurns.set(threadId, {
+				resolve,
+				reject,
+				chunks: [],
+				modelHint,
+				onDelta: options?.onDelta,
+			});
 		});
 
 		const turnParams: Record<string, unknown> = {
@@ -440,7 +448,9 @@ export class CodexWebSocketClient extends Events {
 			case "item/agentMessage/delta": {
 				const delta = (params.delta as string) ?? "";
 				if (threadId && this.activeTurns.has(threadId)) {
-					this.activeTurns.get(threadId)!.chunks.push(delta);
+					const turn = this.activeTurns.get(threadId)!;
+					turn.chunks.push(delta);
+					turn.onDelta?.(delta);
 				}
 				this.trigger("delta", delta);
 				break;
@@ -628,14 +638,28 @@ export class CodexWebSocketClient extends Events {
 		return models.find((m) => m.id === id) ?? null;
 	}
 
-	private getDirectConfig(): DirectConfig | null {
+	private getDirectConfig(options?: QueryOptions): DirectConfig | null {
+		const active = this.getBaseDirectConfig();
+		const provider = options?.providerOverride ?? active?.provider ?? this.settings.provider ?? "openai";
+		const model = (options?.model ?? active?.model ?? "").trim();
+		if (!model) return null;
+		return {
+			provider,
+			baseUrl: (options?.baseUrlOverride ?? active?.baseUrl ?? "").trim() || this.defaultBaseUrlForProvider(provider),
+			apiKey: this.resolveApiKeyForProvider(provider, options?.apiKeyOverride ?? active?.apiKey),
+			model,
+			maxOutputTokens: active?.maxOutputTokens ?? this.settings.maxOutputTokens,
+		};
+	}
+
+	private getBaseDirectConfig(): DirectConfig | null {
 		const active = this.getActiveCustomModel();
 		if (active) {
 			const provider = active.provider ?? this.settings.provider ?? "openai";
 			return {
 				provider,
 				baseUrl: (active.baseUrl ?? this.settings.baseUrl ?? "").trim() || this.defaultBaseUrlForProvider(provider),
-				apiKey: (active.apiKey ?? this.settings.apiKey ?? "").trim(),
+				apiKey: this.resolveApiKeyForProvider(provider, active.apiKey),
 				model: (active.model ?? "").trim(),
 				maxOutputTokens: active.maxOutputTokens ?? this.settings.maxOutputTokens,
 			};
@@ -647,10 +671,19 @@ export class CodexWebSocketClient extends Events {
 		return {
 			provider,
 			baseUrl: (this.settings.baseUrl ?? "").trim() || this.defaultBaseUrlForProvider(provider),
-			apiKey: (this.settings.apiKey ?? "").trim(),
+			apiKey: this.resolveApiKeyForProvider(provider),
 			model,
 			maxOutputTokens: this.settings.maxOutputTokens,
 		};
+	}
+
+	private resolveApiKeyForProvider(provider: LLMProvider, preferred?: string): string {
+		const direct = (preferred ?? "").trim();
+		if (direct) return direct;
+		const providerKeys = this.settings.providerApiKeys ?? {};
+		const remembered = typeof providerKeys[provider] === "string" ? providerKeys[provider]!.trim() : "";
+		if (remembered) return remembered;
+		return (this.settings.apiKey ?? "").trim();
 	}
 
 	private resolveEndpoint(baseUrl: string, suffixPath: string): string {
@@ -667,6 +700,9 @@ export class CodexWebSocketClient extends Events {
 
 	private defaultBaseUrlForProvider(provider: LLMProvider): string {
 		if (provider === "anthropic") return "https://api.anthropic.com";
+		if (provider === "openrouter") return "https://openrouter.ai/api/v1";
+		if (provider === "minimax") return "https://api.minimax.io/v1";
+		if (provider === "zai") return "https://api.z.ai/api/paas/v4";
 		return "https://api.openai.com";
 	}
 
@@ -702,6 +738,13 @@ export class CodexWebSocketClient extends Events {
 			return {
 				responses: `${base}/responses`,
 				chatCompletions: `${base}/chat/completions`,
+			};
+		}
+
+		if (/api\.z\.ai\/api\/paas\/v4$/i.test(trimmed)) {
+			return {
+				responses: `${trimmed}/responses`,
+				chatCompletions: `${trimmed}/chat/completions`,
 			};
 		}
 
@@ -741,7 +784,7 @@ export class CodexWebSocketClient extends Events {
 					return "";
 				})
 				.join("")
-				trim();
+				.trim();
 			if (text) return text;
 		}
 
@@ -757,7 +800,7 @@ export class CodexWebSocketClient extends Events {
 					return "";
 				})
 				.join("")
-				trim();
+				.trim();
 			if (text) return text;
 		}
 
@@ -779,7 +822,7 @@ export class CodexWebSocketClient extends Events {
 						.join("");
 				})
 				.join("")
-				trim();
+				.trim();
 			if (text) return text;
 		}
 
