@@ -3,6 +3,7 @@ import { CodexWebSocketClient } from "./websocket-client";
 import {
 	buildQueryOptionsFromRuntimeOption,
 	DIRECT_RUNTIME_OPTIONS,
+	getRuntimeHintText,
 	RUNTIME_MODE_OPTIONS,
 	resolveRuntimeFromMode,
 	type RuntimeModelOption,
@@ -103,14 +104,14 @@ export class LLMCanvasSidebarView extends ItemView {
 
 		const bar = contentEl.createDiv({ cls: "llm-canvas-inline-bar" });
 		const modeWrap = bar.createDiv({ cls: "llm-canvas-option" });
-		modeWrap.createSpan({ text: "Execution" });
+		modeWrap.createSpan({ cls: "llm-control-label", text: "Runtime" });
 		this.runtimeModeSelect = modeWrap.createEl("select", { cls: "llm-runtime-mode-select" });
 		for (const option of RUNTIME_MODE_OPTIONS) {
 			this.runtimeModeSelect.createEl("option", { value: option.value, text: option.label });
 		}
 
 		const directWrap = bar.createDiv({ cls: "llm-canvas-option llm-runtime-direct-wrap" });
-		directWrap.createSpan({ text: "Model" });
+		directWrap.createSpan({ cls: "llm-control-label", text: "Preset" });
 		this.directModelSelect = directWrap.createEl("select", { cls: "llm-block-model-select" });
 		for (const option of this.availableModels) {
 			this.directModelSelect.createEl("option", { value: option.id, text: option.label });
@@ -212,7 +213,7 @@ export class LLMCanvasSidebarView extends ItemView {
 			this.bindingStateBadge.setText("Binding: active");
 			this.bindingStateBadge.classList.add("llm-binding-active");
 			this.bindingStateBadge.classList.remove("llm-binding-stale");
-			this.contextHint.setText(`Editing: ${this.boundFileName || "Current note"} · ${this.scope}`);
+			this.contextHint.setText(`Editing: ${this.boundFileName || "Current note"} | ${this.scope}`);
 		} else {
 			this.bindingStateBadge.setText("Binding: stale (note changed)");
 			this.bindingStateBadge.classList.add("llm-binding-stale");
@@ -321,13 +322,7 @@ export class LLMCanvasSidebarView extends ItemView {
 
 	private refreshRuntimeHint(): void {
 		const selected = this.getSelectedRuntime();
-		this.runtimeHint.textContent = this.getRuntimeHintText(selected);
-	}
-
-	private getRuntimeHintText(selected: RuntimeModelOption): string {
-		return selected.transportMode === "websocket"
-			? "Execution path: Codex appserver (WebSocket)"
-			: `Execution path: direct API (${selected.provider ?? "provider"}) ${selected.model}`;
+		this.runtimeHint.textContent = getRuntimeHintText(selected);
 	}
 
 	private renderCanvasError(message: string): void {

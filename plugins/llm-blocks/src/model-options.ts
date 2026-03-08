@@ -71,10 +71,6 @@ export function resolveRuntimeFromMode(
 	return DIRECT_RUNTIME_OPTIONS.find((option) => option.id === directId) ?? DIRECT_RUNTIME_OPTIONS[0];
 }
 
-export function resolveRuntimeModelOption(id?: string): RuntimeModelOption {
-	return RUNTIME_MODEL_OPTIONS.find((option) => option.id === id) ?? RUNTIME_MODEL_OPTIONS[0];
-}
-
 export function buildQueryOptionsFromRuntimeOption(
 	option: RuntimeModelOption,
 ): Pick<QueryOptions, "model" | "transportModeOverride" | "providerOverride" | "baseUrlOverride"> {
@@ -88,6 +84,12 @@ export function buildQueryOptionsFromRuntimeOption(
 		providerOverride: option.provider,
 		baseUrlOverride: option.baseUrl,
 	};
+}
+
+export function getRuntimeHintText(option: RuntimeModelOption): string {
+	return option.transportMode === "websocket"
+		? "Runtime: Codex Server"
+		: `Runtime: Direct Model via ${option.provider ?? "provider"} (${option.model})`;
 }
 
 export function resolveRuntimeModelIdFromSettings(

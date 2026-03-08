@@ -5,9 +5,9 @@ import type { QueryOptions, QueryResult } from "./types";
 import {
 	buildQueryOptionsFromRuntimeOption,
 	DIRECT_RUNTIME_OPTIONS,
+	getRuntimeHintText,
 	RUNTIME_MODE_OPTIONS,
 	resolveRuntimeFromMode,
-	RUNTIME_MODEL_OPTIONS,
 	type RuntimeModelOption,
 } from "./model-options";
 
@@ -58,14 +58,14 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		const headerActions = header.createDiv({ cls: "llm-block-header-actions" });
 
 		const modeWrap = headerActions.createDiv({ cls: "llm-canvas-option" });
-		modeWrap.createSpan({ text: "Execution path" });
+		modeWrap.createSpan({ cls: "llm-control-label", text: "Runtime" });
 		this.runtimeModeSelect = modeWrap.createEl("select", { cls: "llm-runtime-mode-select" });
 		for (const option of RUNTIME_MODE_OPTIONS) {
 			this.runtimeModeSelect.createEl("option", { value: option.value, text: option.label });
 		}
 
 		const directWrap = headerActions.createDiv({ cls: "llm-canvas-option llm-runtime-direct-wrap" });
-		directWrap.createSpan({ text: "Model" });
+		directWrap.createSpan({ cls: "llm-control-label", text: "Preset" });
 		this.directModelSelect = directWrap.createEl("select", { cls: "llm-block-model-select" });
 		for (const option of this.availableModels) {
 			this.directModelSelect.createEl("option", { value: option.id, text: option.label });
@@ -220,14 +220,8 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 
 	private syncRuntimeHint(): void {
 		if (this.runtimeHintEl) {
-			this.runtimeHintEl.textContent = this.getRuntimeHintText(this.getSelectedRuntime());
+			this.runtimeHintEl.textContent = getRuntimeHintText(this.getSelectedRuntime());
 		}
-	}
-
-	private getRuntimeHintText(selected: RuntimeModelOption): string {
-		return selected.transportMode === "websocket"
-			? "Execution path: Codex appserver (WebSocket)"
-			: `Execution path: direct API (${selected.provider ?? "provider"}) ${selected.model}`;
 	}
 
 	private getRuntimeCacheVariant(): string {

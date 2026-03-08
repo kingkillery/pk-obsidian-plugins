@@ -2,8 +2,10 @@ import { App, EditorPosition, MarkdownRenderer, MarkdownView, Modal, Notice } fr
 import { CodexWebSocketClient } from "./websocket-client";
 import {
 	buildQueryOptionsFromRuntimeOption,
-	resolveRuntimeModelOption,
-	RUNTIME_MODEL_OPTIONS,
+	DIRECT_RUNTIME_OPTIONS,
+	getRuntimeHintText,
+	RUNTIME_MODE_OPTIONS,
+	resolveRuntimeFromMode,
 	type RuntimeModelOption,
 } from "./model-options";
 
@@ -22,7 +24,8 @@ export class LLMCanvasModal extends Modal {
 	private applyBtn!: HTMLButtonElement;
 	private liveApplyToggle!: HTMLInputElement;
 	private scopeSelect!: HTMLSelectElement;
-	private modelSelect!: HTMLSelectElement;
+	private runtimeModeSelect!: HTMLSelectElement;
+	private directModelSelect!: HTMLSelectElement;
 	private runtimeHint!: HTMLElement;
 	private running = false;
 	private output = "";
@@ -30,7 +33,7 @@ export class LLMCanvasModal extends Modal {
 	private targetEndOffset = 0;
 	private sourcePath = "";
 	private readonly options: LLMCanvasModalOptions;
-	private readonly availableModels: RuntimeModelOption[] = RUNTIME_MODEL_OPTIONS;
+	private readonly availableModels: RuntimeModelOption[] = DIRECT_RUNTIME_OPTIONS;
 
 	constructor(app: App, private client: CodexWebSocketClient, options?: LLMCanvasModalOptions) {
 		super(app);
@@ -61,26 +64,47 @@ export class LLMCanvasModal extends Modal {
 		const optionsRow = controls.createDiv({ cls: "llm-canvas-options" });
 
 		const scopeWrap = optionsRow.createDiv({ cls: "llm-canvas-option" });
-		scopeWrap.createSpan({ text: "Replace scope" });
+		scopeWrap.createSpan({ cls: "llm-control-label", text: "Scope" });
 		this.scopeSelect = scopeWrap.createEl("select");
 		this.scopeSelect.createEl("option", { value: "selection", text: "Selection" });
 		this.scopeSelect.createEl("option", { value: "note", text: "Whole note" });
 		this.scopeSelect.value = this.options.initialScope ?? "selection";
 
-		const modelWrap = optionsRow.createDiv({ cls: "llm-canvas-option" });
-		modelWrap.createSpan({ text: "Execution path" });
-		this.modelSelect = modelWrap.createEl("select");
-		for (const option of this.availableModels) {
-			this.modelSelect.createEl("option", { value: option.id, text: option.label });
+		const modeWrap = optionsRow.createDiv({ cls: "llm-canvas-option" });
+		modeWrap.createSpan({ cls: "llm-control-label", text: "Runtime" });
+		this.runtimeModeSelect = modeWrap.createEl("select", { cls: "llm-runtime-mode-select" });
+		for (const option of RUNTIME_MODE_OPTIONS) {
+			this.runtimeModeSelect.createEl("option", { value: option.value, text: option.label });
 		}
-		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
-		this.modelSelect.addEventListener("change", () => this.refreshRuntimeHint());
+
+		const directWrap = optionsRow.createDiv({ cls: "llm-canvas-option llm-runtime-direct-wrap" });
+		directWrap.createSpan({ cls: "llm-control-label", text: "Preset" });
+		this.directModelSelect = directWrap.createEl("select", { cls: "llm-block-model-select" });
+		for (const option of this.availableModels) {
+			this.directModelSelect.createEl("option", { value: option.id, text: option.label });
+		}
+
+		const preferredId = this.client.getPreferredRuntimeModelOptionId();
+		if (preferredId === "codex-appserver") {
+			this.runtimeModeSelect.value = "codex-appserver";
+		} else {
+			this.runtimeModeSelect.value = "direct-model";
+			this.directModelSelect.value = preferredId;
+		}
+
+		const updateRuntimeSelections = (): void => {
+			directWrap.style.display = this.runtimeModeSelect.value === "direct-model" ? "inline-flex" : "none";
+			this.refreshRuntimeHint();
+		};
+		this.runtimeModeSelect.addEventListener("change", updateRuntimeSelections);
+		this.directModelSelect.addEventListener("change", () => this.refreshRuntimeHint());
+		updateRuntimeSelections();
 		this.runtimeHint = optionsRow.createDiv({ cls: "llm-canvas-runtime-hint" });
 		this.refreshRuntimeHint();
 
 		const liveWrap = optionsRow.createDiv({ cls: "llm-canvas-option" });
 		this.liveApplyToggle = liveWrap.createEl("input", { type: "checkbox" });
-		liveWrap.createSpan({ text: "Live apply while generating" });
+		liveWrap.createSpan({ cls: "llm-control-label", text: "Live apply" });
 
 		const buttonRow = controls.createDiv({ cls: "llm-canvas-actions" });
 		this.runBtn = buttonRow.createEl("button", { text: "Generate" });
@@ -153,12 +177,32 @@ export class LLMCanvasModal extends Modal {
 		addBtn.addEventListener("click", () => {
 			this.promptInput.focus();
 		});
-		this.modelSelect = bar.createEl("select", { cls: "llm-block-model-select" });
-		for (const option of this.availableModels) {
-			this.modelSelect.createEl("option", { value: option.id, text: option.label });
+		const modeWrap = bar.createDiv({ cls: "llm-canvas-option" });
+		modeWrap.createSpan({ cls: "llm-control-label", text: "Runtime" });
+		this.runtimeModeSelect = modeWrap.createEl("select", { cls: "llm-runtime-mode-select" });
+		for (const option of RUNTIME_MODE_OPTIONS) {
+			this.runtimeModeSelect.createEl("option", { value: option.value, text: option.label });
 		}
-		this.modelSelect.value = this.client.getPreferredRuntimeModelOptionId();
-		this.modelSelect.addEventListener("change", () => this.refreshRuntimeHint());
+		const directWrap = bar.createDiv({ cls: "llm-canvas-option llm-runtime-direct-wrap" });
+		directWrap.createSpan({ cls: "llm-control-label", text: "Preset" });
+		this.directModelSelect = directWrap.createEl("select", { cls: "llm-block-model-select" });
+		for (const option of this.availableModels) {
+			this.directModelSelect.createEl("option", { value: option.id, text: option.label });
+		}
+		const preferredId = this.client.getPreferredRuntimeModelOptionId();
+		if (preferredId === "codex-appserver") {
+			this.runtimeModeSelect.value = "codex-appserver";
+		} else {
+			this.runtimeModeSelect.value = "direct-model";
+			this.directModelSelect.value = preferredId;
+		}
+		const updateInlineRuntimeSelections = (): void => {
+			directWrap.style.display = this.runtimeModeSelect.value === "direct-model" ? "inline-flex" : "none";
+			this.refreshRuntimeHint();
+		};
+		this.runtimeModeSelect.addEventListener("change", updateInlineRuntimeSelections);
+		this.directModelSelect.addEventListener("change", () => this.refreshRuntimeHint());
+		updateInlineRuntimeSelections();
 		this.promptInput = bar.createEl("input", {
 			cls: "llm-canvas-inline-input",
 			type: "text",
@@ -275,7 +319,8 @@ export class LLMCanvasModal extends Modal {
 
 		this.running = true;
 		this.runBtn.disabled = true;
-		this.modelSelect.disabled = true;
+		this.runtimeModeSelect.disabled = true;
+		this.directModelSelect.disabled = true;
 		this.refreshRuntimeHint();
 		this.runBtn.setText(this.options.inlineMode ? "Sending..." : "Generating...");
 		this.output = "";
@@ -308,31 +353,68 @@ export class LLMCanvasModal extends Modal {
 			}
 			await this.renderPreview();
 		} catch (e) {
-			new Notice(`Canvas generation failed: ${(e as Error).message}`);
+			this.renderCanvasError((e as Error).message);
 		} finally {
 			this.running = false;
 			this.runBtn.disabled = false;
-			this.modelSelect.disabled = false;
+			this.runtimeModeSelect.disabled = false;
+			this.directModelSelect.disabled = false;
 			this.refreshRuntimeHint();
 			this.runBtn.setText(this.options.inlineMode ? "Send" : "Generate");
 		}
 	}
 
 	private getSelectedRuntime(): RuntimeModelOption {
-		const selected = resolveRuntimeModelOption(this.modelSelect?.value);
-		this.modelSelect.title = this.getRuntimeHintText(selected);
-		return selected;
+		const mode = this.runtimeModeSelect?.value === "direct-model" ? "direct-model" : "codex-appserver";
+		return resolveRuntimeFromMode(mode, this.directModelSelect?.value);
 	}
 
 	private refreshRuntimeHint(): void {
 		const selected = this.getSelectedRuntime();
-		this.runtimeHint.setText(this.getRuntimeHintText(selected));
+		this.runtimeHint.setText(getRuntimeHintText(selected));
 	}
 
-	private getRuntimeHintText(selected: RuntimeModelOption): string {
-		return selected.transportMode === "websocket"
-			? "Execution path: Codex appserver (WebSocket)"
-			: `Execution path: direct API (${selected.provider ?? "provider"}) ${selected.model}`;
+	private renderCanvasError(message: string): void {
+		const errorText = message || "Unknown error";
+		this.outputPreview.empty();
+		const errWrap = this.outputPreview.createDiv({ cls: "llm-block-error" });
+		errWrap.createDiv({ cls: "llm-block-error-summary", text: `Error: ${errorText}` });
+		const actionRow = errWrap.createDiv({ cls: "llm-block-error-actions" });
+		const errorLower = errorText.toLowerCase();
+		const addAction = (label: string, run: () => void) => {
+			const button = actionRow.createEl("button", { text: label, cls: "llm-block-error-btn" });
+			button.addEventListener("click", run);
+		};
+
+		if (errorLower.includes("not connected") || errorLower.includes("websocket") || errorLower.includes("connection")) {
+			addAction("Reconnect", () => {
+				this.client.disconnect();
+				this.client.connect();
+			});
+		}
+
+		if (errorLower.includes("unauthenticated") || errorLower.includes("not logged") || errorLower.includes("api key")) {
+			addAction("Open settings", async () => {
+				await this.app.setting.open();
+			});
+			addAction("Check API key", () => {
+				new Notice("Paste a valid API key in plugin settings and retry.");
+			});
+		}
+
+		if (errorLower.includes("balance") || errorLower.includes("billing")) {
+			addAction("Provider balance issue", () => {
+				new Notice("Open your provider billing page and confirm available credits.");
+			});
+		}
+
+		if (actionRow.childElementCount === 0) {
+			addAction("Open settings", async () => {
+				await this.app.setting.open();
+			});
+		}
+
+		errWrap.createDiv({ cls: "llm-block-error-detail", text: `Raw: ${errorText}` });
 	}
 
 	private applyOutputToEditor(): boolean {

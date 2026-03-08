@@ -35,6 +35,16 @@
 	letter-spacing: 0.05em;
 }
 
+.llm-control-label {
+	font-size: var(--font-smaller);
+	font-weight: var(--font-medium);
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	white-space: nowrap;
+	opacity: 0.82;
+}
+
 .llm-block-run-btn {
 	display: inline-flex;
 	align-items: center;
@@ -266,7 +276,8 @@
 	align-items: center;
 	padding: 2px 8px;
 	border-radius: 999px;
-	background: var(--background-secondary);
+	background: transparent;
+	border: 1px solid var(--background-modifier-border);
 	color: var(--text-muted);
 	font-size: var(--font-smaller);
 }
@@ -275,6 +286,10 @@
 	font-size: var(--font-smaller);
 	color: var(--text-muted);
 	line-height: 1.25;
+	padding: 0;
+	background: transparent;
+	border-radius: 0;
+	opacity: 0.88;
 }
 
 .llm-binding-active,
@@ -337,6 +352,7 @@
 	gap: 6px;
 	align-items: center;
 	min-width: 0;
+	flex-wrap: wrap;
 }
 
 .llm-canvas-actions {
@@ -399,10 +415,10 @@
 
 .llm-canvas-chip {
 	flex: 0 0 auto;
-	padding: 2px 10px;
-	border-radius: 999px;
+	padding: 3px 10px;
+	border-radius: var(--radius-s);
 	border: 1px solid var(--background-modifier-border);
-	background: transparent;
+	background: var(--background-primary);
 	color: var(--text-muted);
 	font-size: var(--font-smaller);
 	cursor: pointer;
@@ -432,17 +448,17 @@
 	gap: 6px;
 	align-items: center;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 999px;
-	background: var(--background-primary);
-	padding: 6px;
+	border-radius: calc(var(--radius-m) + 2px);
+	background: var(--background-secondary);
+	padding: 4px 6px;
 }
 
 .llm-canvas-inline-icon,
 .llm-canvas-inline-send {
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 999px;
-	background: var(--background-secondary);
-	padding: 6px 10px;
+	border-radius: var(--radius-s);
+	background: transparent;
+	padding: 5px 10px;
 	cursor: pointer;
 }
 
@@ -450,7 +466,7 @@
 	background: var(--interactive-accent);
 	border-color: var(--interactive-accent);
 	color: var(--text-on-accent);
-	font-weight: var(--font-semibold);
+	font-weight: var(--font-medium);
 }
 
 .llm-canvas-inline-send:disabled {
@@ -459,7 +475,7 @@
 }
 
 .llm-canvas-inline-apply {
-	background: var(--background-secondary);
+	background: transparent;
 	color: var(--text-normal);
 	border-color: var(--background-modifier-border);
 }
@@ -480,6 +496,7 @@
 .llm-canvas-inline-hint {
 	color: var(--text-muted);
 	font-size: var(--font-smaller);
+	opacity: 0.88;
 }
 
 .llm-canvas-docked {
