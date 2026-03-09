@@ -92,6 +92,38 @@ export default class LLMBlocksPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "llm-quick-ask-selection",
+			name: "Quick Ask Selection",
+			callback: () => {
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				const selection = view?.editor.getSelection().trim() ?? "";
+				if (!view || !selection) {
+					new Notice("Select markdown or code first, then run Quick Ask Selection.");
+					return;
+				}
+				new LLMCanvasModal(this.app, this.wsClient, this.contextManager, {
+					initialScope: "selection",
+					inlineMode: true,
+				}).open();
+			},
+		});
+
+		this.addCommand({
+			id: "llm-ask-active-note",
+			name: "Ask Active Note",
+			callback: () => {
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (!view) {
+					new Notice("Open a markdown note first.");
+					return;
+				}
+				new LLMCanvasModal(this.app, this.wsClient, this.contextManager, {
+					initialScope: "note",
+				}).open();
+			},
+		});
+
+		this.addCommand({
 			id: "llm-inline-replace-selection",
 			name: "Inline Replace Selection (Canvas)",
 			callback: () => {
