@@ -1,5 +1,6 @@
 import { App, EditorPosition, MarkdownRenderer, MarkdownView, Modal, Notice } from "obsidian";
 import { CodexWebSocketClient } from "./websocket-client";
+import { CopilotContextManager } from "./copilot-context";
 import {
 	buildQueryOptionsFromRuntimeOption,
 	DIRECT_RUNTIME_OPTIONS,
@@ -35,7 +36,12 @@ export class LLMCanvasModal extends Modal {
 	private readonly options: LLMCanvasModalOptions;
 	private readonly availableModels: RuntimeModelOption[] = DIRECT_RUNTIME_OPTIONS;
 
-	constructor(app: App, private client: CodexWebSocketClient, options?: LLMCanvasModalOptions) {
+	constructor(
+		app: App,
+		private client: CodexWebSocketClient,
+		private readonly contextManager: CopilotContextManager,
+		options?: LLMCanvasModalOptions,
+	) {
 		super(app);
 		this.options = options ?? {};
 	}
@@ -289,7 +295,7 @@ export class LLMCanvasModal extends Modal {
 
 	private buildPrompt(instruction: string, currentMarkdown: string): string {
 		return [
-			instruction.trim(),
+			this.contextManager.buildPromptWithContext(instruction.trim()),
 			"",
 			"Rewrite the markdown below. Return only the replacement markdown with no explanation.",
 			"",

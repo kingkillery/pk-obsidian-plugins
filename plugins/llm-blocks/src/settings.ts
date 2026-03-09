@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type LLMBlocksPlugin from "./main";
 import type { CustomModelConfig, LLMProvider } from "./types";
 
@@ -179,6 +179,47 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 						this.display();
 					})
+			);
+
+		containerEl.createEl("h3", { text: "Copilot context" });
+		new Setting(containerEl)
+			.setName("Auto-attach current selection")
+			.setDesc("Capture the latest markdown selection and prepend it to `llm` block prompts as explicit context.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoAttachSelectionContext)
+					.onChange(async (value) => {
+						this.plugin.settings.autoAttachSelectionContext = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Attach active note snapshot")
+			.setDesc("Optionally prepend the current note body as additional context for `llm` blocks.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.attachActiveNoteContext)
+					.onChange(async (value) => {
+						this.plugin.settings.attachActiveNoteContext = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Context character budget")
+			.setDesc("Maximum characters copied from attached selection/note context before truncation.")
+			.addText((text) =>
+				text
+					.setPlaceholder("6000")
+					.setValue(String(this.plugin.settings.maxContextChars))
+					.onChange(async (value) => {
+						const parsed = Number(value);
+						if (Number.isFinite(parsed) && parsed >= 500) {
+							this.plugin.settings.maxContextChars = Math.floor(parsed);
+							await this.plugin.saveSettings();
+						}
+					}),
 			);
 
 		containerEl.createEl("h3", { text: "Cache" });

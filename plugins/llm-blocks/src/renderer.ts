@@ -2,6 +2,7 @@ import { App, MarkdownRenderChild, MarkdownRenderer, Notice, Component } from "o
 import { ResponseCache } from "./cache";
 import { CodexWebSocketClient } from "./websocket-client";
 import type { QueryOptions, QueryResult } from "./types";
+import { CopilotContextManager } from "./copilot-context";
 import {
 	buildQueryOptionsFromRuntimeOption,
 	DIRECT_RUNTIME_OPTIONS,
@@ -26,6 +27,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 	private directModelSelect!: HTMLSelectElement;
 	private runBtn!: HTMLButtonElement;
 	private runtimeHintEl!: HTMLElement;
+	private contextHintEl!: HTMLElement;
 	private readonly availableModels: RuntimeModelOption[] = DIRECT_RUNTIME_OPTIONS;
 
 	constructor(
@@ -34,6 +36,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		prompt: string,
 		cache: ResponseCache,
 		client: CodexWebSocketClient,
+		private readonly contextManager: CopilotContextManager,
 		sourcePath: string,
 	) {
 		super(containerEl);
@@ -72,6 +75,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		}
 
 		this.runtimeHintEl = modeWrap.createDiv({ cls: "llm-canvas-runtime-hint" });
+		this.contextHintEl = header.createDiv({ cls: "llm-canvas-runtime-hint" });
 
 		const preferredId = this.client.getPreferredRuntimeModelOptionId();
 		if (this.isCodexRuntime(preferredId)) {
@@ -91,6 +95,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 				void this.syncCachedResponse();
 			}
 			this.syncRuntimeHint();
+			this.syncContextHint();
 		};
 		this.runtimeModeSelect.addEventListener("change", updateRuntimeSelection);
 		this.directModelSelect.addEventListener("change", () => {
@@ -98,6 +103,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 				void this.syncCachedResponse();
 			}
 			this.syncRuntimeHint();
+			this.syncContextHint();
 		});
 		updateRuntimeSelection();
 
@@ -111,6 +117,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		promptEl.createEl("pre", { text: this.prompt });
 
 		this.syncRuntimeHint();
+		this.syncContextHint();
 		await this.syncCachedResponse();
 	}
 
@@ -166,13 +173,14 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 			}
 
 			const selectedRuntime = this.getSelectedRuntime();
+			const promptWithContext = this.contextManager.buildPromptWithContext(trimmedPrompt);
 			const queryOptions: QueryOptions = {
 				...buildQueryOptionsFromRuntimeOption(selectedRuntime),
 			};
 			if (this.threadId) {
 				queryOptions.threadId = this.threadId;
 			}
-			const result = await this.client.query(trimmedPrompt, queryOptions);
+			const result = await this.client.query(promptWithContext, queryOptions);
 			const resolvedThreadId = (result.threadId ?? this.threadId ?? "").trim();
 			if (resolvedThreadId) {
 				this.threadId = resolvedThreadId;
@@ -224,6 +232,12 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 		}
 	}
 
+	private syncContextHint(): void {
+		if (!this.contextHintEl) return;
+		const summary = this.contextManager.getAttachedContextSummary();
+		this.contextHintEl.textContent = summary ? `Context: ${summary}` : "Context: prompt only";
+	}
+
 	private getRuntimeCacheVariant(): string {
 		const selected = this.getSelectedRuntime();
 		return JSON.stringify({
@@ -232,6 +246,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 			provider: selected.provider ?? "",
 			baseUrl: selected.baseUrl ?? "",
 			model: selected.model ?? "",
+			context: this.contextManager.getCacheVariant(),
 		});
 	}
 

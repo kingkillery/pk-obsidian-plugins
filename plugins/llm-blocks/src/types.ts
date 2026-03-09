@@ -28,6 +28,9 @@ export interface LLMBlocksSettings {
 	customModelsJson: string;
 	activeModelId: string;
 	showAdvancedSettings: boolean;
+	autoAttachSelectionContext: boolean;
+	attachActiveNoteContext: boolean;
+	maxContextChars: number;
 }
 
 export const DEFAULT_SETTINGS: LLMBlocksSettings = {
@@ -45,6 +48,9 @@ export const DEFAULT_SETTINGS: LLMBlocksSettings = {
 	customModelsJson: "",
 	activeModelId: "",
 	showAdvancedSettings: false,
+	autoAttachSelectionContext: true,
+	attachActiveNoteContext: false,
+	maxContextChars: 6000,
 };
 
 export type AuthState = "unchecked" | "authenticated" | "unauthenticated";

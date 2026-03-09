@@ -7,11 +7,13 @@ import { LLMBlocksSettingTab } from "./settings";
 import { LLMCanvasModal } from "./canvas-modal";
 import { MarkdownView, Notice } from "obsidian";
 import { CANVAS_VIEW_TYPE, LLMCanvasSidebarView } from "./canvas-sidebar-view";
+import { CopilotContextManager } from "./copilot-context";
 
 export default class LLMBlocksPlugin extends Plugin {
 	settings: LLMBlocksSettings = DEFAULT_SETTINGS;
 	cache = new ResponseCache();
 	wsClient!: CodexWebSocketClient;
+	contextManager!: CopilotContextManager;
 	private statusBarEl: HTMLElement | null = null;
 	private settingsTab: LLMBlocksSettingTab | null = null;
 
@@ -19,7 +21,9 @@ export default class LLMBlocksPlugin extends Plugin {
 		await this.loadSettings();
 
 		this.wsClient = new CodexWebSocketClient(this.settings);
-		this.registerView(CANVAS_VIEW_TYPE, (leaf) => new LLMCanvasSidebarView(leaf, this.wsClient));
+		this.contextManager = new CopilotContextManager(this.app, () => this.settings);
+		this.contextManager.initialize();
+		this.registerView(CANVAS_VIEW_TYPE, (leaf) => new LLMCanvasSidebarView(leaf, this.wsClient, this.contextManager));
 
 		// Status bar
 		this.statusBarEl = this.addStatusBarItem();
@@ -49,6 +53,7 @@ export default class LLMBlocksPlugin extends Plugin {
 				source,
 				this.cache,
 				this.wsClient,
+				this.contextManager,
 				ctx.sourcePath,
 			);
 			ctx.addChild(renderer);
@@ -83,7 +88,7 @@ export default class LLMBlocksPlugin extends Plugin {
 		this.addCommand({
 			id: "llm-open-canvas-modal",
 			name: "Open LLM Canvas (Modal)",
-			callback: () => { new LLMCanvasModal(this.app, this.wsClient).open(); },
+			callback: () => { new LLMCanvasModal(this.app, this.wsClient, this.contextManager).open(); },
 		});
 
 		this.addCommand({
@@ -111,6 +116,7 @@ export default class LLMBlocksPlugin extends Plugin {
 
 	onunload(): void {
 		this.app.workspace.detachLeavesOfType(CANVAS_VIEW_TYPE);
+		this.contextManager.cleanup();
 		this.wsClient.disconnect();
 	}
 
@@ -136,8 +142,24 @@ export default class LLMBlocksPlugin extends Plugin {
 	}
 
 	async saveSettings(): Promise<void> {
+		const previous = this.settings;
 		await this.saveData(this.settings);
-		this.wsClient.updateSettings(this.settings);
+		if (this.shouldRefreshTransport(previous, this.settings)) {
+			this.wsClient.updateSettings(this.settings);
+		}
+	}
+
+	private shouldRefreshTransport(previous: LLMBlocksSettings, next: LLMBlocksSettings): boolean {
+		return previous.wsEndpoint !== next.wsEndpoint
+			|| previous.transportMode !== next.transportMode
+			|| previous.model !== next.model
+			|| previous.provider !== next.provider
+			|| previous.baseUrl !== next.baseUrl
+			|| previous.maxOutputTokens !== next.maxOutputTokens
+			|| previous.apiKey !== next.apiKey
+			|| previous.activeModelId !== next.activeModelId
+			|| previous.customModelsJson !== next.customModelsJson
+			|| JSON.stringify(previous.providerApiKeys ?? {}) !== JSON.stringify(next.providerApiKeys ?? {});
 	}
 
 	private updateStatusBar(state: ConnectionState, auth: AuthState): void {

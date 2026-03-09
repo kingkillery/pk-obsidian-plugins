@@ -1,5 +1,6 @@
 import { ItemView, MarkdownRenderer, MarkdownView, Notice, WorkspaceLeaf } from "obsidian";
 import { CodexWebSocketClient } from "./websocket-client";
+import { CopilotContextManager } from "./copilot-context";
 import {
 	buildQueryOptionsFromRuntimeOption,
 	DIRECT_RUNTIME_OPTIONS,
@@ -37,7 +38,11 @@ export class LLMCanvasSidebarView extends ItemView {
 	private running = false;
 	private readonly availableModels: RuntimeModelOption[] = DIRECT_RUNTIME_OPTIONS;
 
-	constructor(leaf: WorkspaceLeaf, private client: CodexWebSocketClient) {
+	constructor(
+		leaf: WorkspaceLeaf,
+		private client: CodexWebSocketClient,
+		private readonly contextManager: CopilotContextManager,
+	) {
 		super(leaf);
 	}
 
@@ -213,12 +218,16 @@ export class LLMCanvasSidebarView extends ItemView {
 			this.bindingStateBadge.setText("Binding: active");
 			this.bindingStateBadge.classList.add("llm-binding-active");
 			this.bindingStateBadge.classList.remove("llm-binding-stale");
-			this.contextHint.setText(`Editing: ${this.boundFileName || "Current note"} | ${this.scope}`);
+			const attached = this.contextManager.getAttachedContextSummary();
+			const base = `Editing: ${this.boundFileName || "Current note"} | ${this.scope}`;
+			this.contextHint.setText(attached ? `${base} | ${attached}` : base);
 		} else {
 			this.bindingStateBadge.setText("Binding: stale (note changed)");
 			this.bindingStateBadge.classList.add("llm-binding-stale");
 			this.bindingStateBadge.classList.remove("llm-binding-active");
-			this.contextHint.setText("Active editor no longer matches bound note. Click Use Current Note to retarget.");
+			const attached = this.contextManager.getAttachedContextSummary();
+			const base = "Active editor no longer matches bound note. Click Use Current Note to retarget.";
+			this.contextHint.setText(attached ? `${base} ${attached}` : base);
 		}
 	}
 
@@ -263,7 +272,7 @@ export class LLMCanvasSidebarView extends ItemView {
 		const current = editor.getValue().slice(this.targetStartOffset, this.targetEndOffset);
 		const selectedRuntime = this.getSelectedRuntime();
 		const prompt = [
-			instruction,
+			this.contextManager.buildPromptWithContext(instruction),
 			"",
 			"Rewrite the markdown below. Return only the replacement markdown with no explanation.",
 			"",
