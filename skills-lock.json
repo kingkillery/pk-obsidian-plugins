@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "symphony-setup": {
+      "source": "odysseus0/symphony",
+      "sourceType": "github",
+      "computedHash": "46a18eb8b74361c5dcd3a1b405b0add638e8fca022de64b64c548257b95321ed"
+    }
+  }
+}
