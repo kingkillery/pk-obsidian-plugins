@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+coverage/
+.env
+.DS_Store
+*.log
+*.db
+*.db-shm
+*.db-wal
+CLAUDE.md
+.claude/
+deno.lock
+better-auth/
+.mcp.json
+backend/logs/*
