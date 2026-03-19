@@ -86,6 +86,44 @@ To remove the global link later:
 npm unlink -g obsidian-multimodal-retrieval
 ```
 
+## Packaging and install on other machines
+
+Create a publish-ready tarball locally:
+
+```powershell
+npm run publish:dry-run
+npm run pack:cli
+```
+
+That produces a file like:
+
+```powershell
+pk-qmd-0.1.0.tgz
+```
+
+Install that tarball on another machine without cloning the repo:
+
+```powershell
+npm install -g .\pk-qmd-0.1.0.tgz
+pk-qmd status
+```
+
+Once you are ready to publish to npm itself:
+
+```powershell
+npm login
+npm publish
+```
+
+Current package name reserved in this repo:
+
+`pk-qmd`
+
+Note:
+
+- the package is configured as `UNLICENSED` right now, so choose a real license before a public npm release if that is your intent
+- `GEMINI_API_KEY` or `GOOGLE_API_KEY` must be present on the target machine for indexing and semantic search
+
 Start the service:
 
 ```powershell

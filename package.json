@@ -1,18 +1,52 @@
 {
-  "name": "obsidian-multimodal-retrieval",
+  "name": "pk-qmd",
   "bin": {
     "pk-qmd": "./bin/pk-qmd.mjs"
   },
-  "private": true,
+  "bugs": {
+    "url": "https://github.com/kingkillery/pk-obsidian-plugins/issues"
+  },
+  "description": "Gemini-backed local vault discovery, indexing, and semantic search for PK QMD and Obsidian workflows.",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "README.md",
+    "bin/",
+    "apps/index-service/package.json",
+    "apps/index-service/src/",
+    "packages/embeddings/package.json",
+    "packages/embeddings/src/"
+  ],
+  "homepage": "https://github.com/kingkillery/pk-obsidian-plugins#readme",
+  "keywords": [
+    "cli",
+    "embeddings",
+    "gemini",
+    "obsidian",
+    "pk-qmd",
+    "qmd",
+    "retrieval",
+    "semantic-search"
+  ],
+  "license": "UNLICENSED",
   "version": "0.1.0",
   "packageManager": "pnpm@10.0.0",
+  "preferGlobal": true,
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kingkillery/pk-obsidian-plugins.git"
+  },
   "scripts": {
     "dev:index-service": "pnpm --dir apps/index-service dev",
     "dev:plugin": "pnpm --dir apps/obsidian-plugin dev",
     "build": "pnpm -r build",
     "discover:vaults": "node apps/index-service/src/server.js --discover-vaults",
     "index:all-vaults": "node apps/index-service/src/server.js --index-all",
+    "pack:cli": "npm pack",
     "pk-qmd": "node ./bin/pk-qmd.mjs",
+    "publish:dry-run": "npm pack --dry-run",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test"
   }
