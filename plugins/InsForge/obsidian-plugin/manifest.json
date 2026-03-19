@@ -1,0 +1,9 @@
+{
+  "id": "insforge",
+  "name": "InsForge",
+  "version": "0.1.0",
+  "minAppVersion": "1.6.0",
+  "description": "Connect Obsidian notes to InsForge backend workflows.",
+  "author": "InsForge",
+  "isDesktopOnly": false
+}

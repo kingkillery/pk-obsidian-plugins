@@ -1,0 +1,291 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "InsForge Docs",
+  "colors": {
+    "primary": "#16A34A",
+    "light": "#07C983",
+    "dark": "#15803D"
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "styling": {
+    "eyebrows": "section"
+  },
+  "seo": {
+    "metatags": {
+      "og:site_name": "InsForge Docs",
+      "google-site-verification": "2dSsr0kxw61j9-qSOR0a1dq1PT6U1-2o3kiZMdsIf9g"
+    },
+    "indexing": "navigable"
+  },
+  "search": {
+    "prompt": "Search InsForge docs..."
+  },
+  "favicon": "/favicon.png",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["introduction", "quickstart", "mcp-setup", "vscode-extension", "partnership", "oauth-server"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              {
+                "group": "Database",
+                "pages": [
+                  "core-concepts/database/architecture",
+                  "core-concepts/database/pgvector"
+                ]
+              },
+              {
+                "group": "Authentication",
+                "pages": [
+                  "core-concepts/authentication/architecture"
+                ]
+              },
+              {
+                "group": "Storage",
+                "pages": [
+                  "core-concepts/storage/architecture"
+                ]
+              },
+              {
+                "group": "AI Integration",
+                "pages": [
+                  "core-concepts/ai/architecture"
+                ]
+              },
+              {
+                "group": "Functions",
+                "pages": [
+                  "core-concepts/functions/architecture",
+                  "core-concepts/functions/schedules"
+                ]
+              },
+              {
+                "group": "Realtime",
+                "pages": [
+                  "core-concepts/realtime/architecture"
+                ]
+              },
+              {
+                "group": "Email (Experimental)",
+                "pages": [
+                  "core-concepts/email/architecture"
+                ]
+              },
+              {
+                "group": "Deployments (Experimental)",
+                "pages": [
+                  "core-concepts/deployments/architecture"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Community Showcase",
+            "pages": ["showcase"]
+          },
+          {
+            "group": "Changelog",
+            "pages": ["changelog"]
+          }
+        ]
+      },
+      {
+        "tab": "SDK & Examples",
+        "groups": [
+          {
+            "group": "TypeScript",
+            "icon": "js",
+            "pages": [
+              "sdks/typescript/overview",
+              "sdks/typescript/database",
+              "sdks/typescript/auth",
+              "sdks/typescript/storage",
+              "sdks/typescript/functions",
+              "sdks/typescript/ai",
+              "sdks/typescript/realtime",
+              "sdks/typescript/email",
+              {
+                "group": "UI Components",
+                "pages": [
+                  "sdks/typescript/ui-components/react",
+                  "sdks/typescript/ui-components/nextjs",
+                  "sdks/typescript/ui-components/customization"
+                ]
+              },
+              {
+                "group": "Framework Guides",
+                "pages": [
+                  "examples/framework-guides/nextjs",
+                  "examples/framework-guides/react",
+                  "examples/framework-guides/vue",
+                  "examples/framework-guides/nuxt",
+                  "examples/framework-guides/svelte"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Swift",
+            "icon": "swift",
+            "pages": [
+              "sdks/swift/overview",
+              "sdks/swift/database",
+              "sdks/swift/auth",
+              "sdks/swift/storage",
+              "sdks/swift/functions",
+              "sdks/swift/ai",
+              "sdks/swift/realtime"
+            ]
+          },
+          {
+            "group": "Kotlin",
+            "icon": "android",
+            "pages": [
+              "sdks/kotlin/overview",
+              "sdks/kotlin/database",
+              "sdks/kotlin/auth",
+              "sdks/kotlin/storage",
+              "sdks/kotlin/functions",
+              "sdks/kotlin/ai",
+              "sdks/kotlin/realtime"
+            ]
+          },
+          {
+            "group": "REST API",
+            "icon": "code",
+            "pages": [
+              "sdks/rest/overview",
+              "sdks/rest/database",
+              "sdks/rest/auth",
+              "sdks/rest/storage",
+              "sdks/rest/functions",
+              "sdks/rest/ai",
+              "sdks/rest/realtime"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": ["examples/overview"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Tables",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+          },
+          {
+            "group": "Authentication",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
+          },
+          {
+            "group": "Records",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/records.yaml"
+          },
+          {
+            "group": "Storage",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/storage.yaml"
+          },
+          {
+            "group": "AI Integration",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/ai.yaml"
+          },
+          {
+            "group": "Functions",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
+          },
+          {
+            "group": "Realtime",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
+          },
+          {
+            "group": "Email",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
+          },
+          {
+            "group": "Secrets",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/secrets.yaml"
+          },
+          {
+            "group": "Logs",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
+          },
+          {
+            "group": "Metadata",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
+          },
+          {
+            "group": "Health",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Community",
+          "href": "https://discord.gg/MPxwj5xVvW",
+          "icon": "discord"
+        },
+        {
+          "anchor": "Blog",
+          "href": "https://insforge.dev/blog",
+          "icon": "newspaper"
+        },
+        {
+          "anchor": "Roadmap",
+          "href": "https://feedback.insforge.dev/roadmap",
+          "icon": "route"
+        },
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/InsForge",
+          "icon": "github"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://insforge.dev"
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://insforge.dev/auth/sign-up"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/InsForge_dev",
+      "github": "https://github.com/insforge",
+      "linkedin": "https://linkedin.com/company/insforge"
+    }
+  }
+}

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Login Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn:hover {
+            background: #3367d6;
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .user-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #4285f4;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4285f4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OAuth Login Example</h1>
+        
+        <div id="loginSection">
+            <p>Click the buttons below to sign in with your account:</p>
+            <button id="googleLoginBtn" class="btn" onclick="initiateGoogleLogin()">
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Sign in with Google
+            </button>
+            <button id="githubLoginBtn" class="btn" onclick="initiateGitHubLogin()" style="background: #333; margin-top: 10px;">
+                <svg width="18" height="18" viewBox="0 0 16 16">
+                    <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                Sign in with GitHub
+            </button>
+        </div>
+
+        <div id="statusSection"></div>
+        <div id="userSection"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:7130/api';
+        
+        // Check if there's OAuth callback data in URL parameters
+        function checkOAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            const userId = urlParams.get('user_id');
+            const email = urlParams.get('email');
+            const name = urlParams.get('name');
+
+            console.log('Checking OAuth callback:', { token: !!token, userId, email, name });
+
+            if (token && userId) {
+                // Clear URL parameters
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Store user information
+                localStorage.setItem('auth_token', token);
+                localStorage.setItem('user_id', userId);
+                localStorage.setItem('user_email', email);
+                localStorage.setItem('user_name', name);
+                
+                showStatus('Login successful!', 'success');
+                showUserInfo({ id: userId, email, name });
+                
+                // Hide login button
+                document.getElementById('loginSection').style.display = 'none';
+            }
+        }
+
+        // Initiate Google login
+        async function initiateGoogleLogin() {
+            const btn = document.getElementById('googleLoginBtn');
+            const originalText = btn.innerHTML;
+            
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loading"></div> Getting authorization link...';
+                
+                showStatus('Getting Google authorization link...', 'info');
+                redirect_url = 'http://localhost/'; // window.location.href
+                // Get authorization URL
+                const response = await fetch(`${API_BASE}/auth/oauth/google?redirect_uri=${encodeURIComponent(redirect_url)}`);
+                const data = await response.json();
+                
+                if (data.authUrl) {
+                    showStatus('Redirecting to Google authorization page...', 'info');
+                    // Redirect to Google authorization page
+                    window.location.href = data.authUrl;
+                } else {
+                    throw new Error(data.error?.message || 'Failed to get authorization link');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // Initiate GitHub login
+        async function initiateGitHubLogin() {
+            const btn = document.getElementById('githubLoginBtn');
+            const originalText = btn.innerHTML;
+            
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loading"></div> Getting authorization link...';
+                
+                showStatus('Getting GitHub authorization link...', 'info');
+                redirect_url = 'http://localhost/';
+                const response = await fetch(`${API_BASE}/auth/oauth/github?redirect_uri=${encodeURIComponent(redirect_url)}`);
+                const data = await response.json();
+                console.log('GitHub OAuth response:', data);
+
+                if (data.authUrl) {
+                    showStatus('Redirecting to GitHub authorization page...', 'info');
+                    window.location.href = data.authUrl;
+                } else {
+                    throw new Error(data.error?.message || 'Failed to get authorization link');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // Show status information
+        function showStatus(message, type = 'info') {
+            const statusSection = document.getElementById('statusSection');
+            statusSection.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        // Show user information
+        function showUserInfo(user) {
+            const userSection = document.getElementById('userSection');
+            userSection.innerHTML = `
+                <div class="user-info">
+                    <h3>User Information</h3>
+                    <p><strong>ID:</strong> ${user.id}</p>
+                    <p><strong>Email:</strong> ${user.email}</p>
+                    <p><strong>Name:</strong> ${user.name}</p>
+                    <button class="btn" onclick="logout()" style="background: #dc3545;">Sign Out</button>
+                </div>
+            `;
+        }
+
+        // Sign out
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user_id');
+            localStorage.removeItem('user_email');
+            localStorage.removeItem('user_name');
+            
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('statusSection').innerHTML = '';
+            document.getElementById('userSection').innerHTML = '';
+            
+            showStatus('Signed out successfully', 'info');
+        }
+
+        // Check login status
+        function checkLoginStatus() {
+            const token = localStorage.getItem('auth_token');
+            const userId = localStorage.getItem('user_id');
+            const email = localStorage.getItem('user_email');
+            const name = localStorage.getItem('user_name');
+
+            if (token && userId) {
+                document.getElementById('loginSection').style.display = 'none';
+                showUserInfo({ id: userId, email, name });
+            }
+        }
+
+        // Execute when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            checkOAuthCallback();
+            checkLoginStatus();
+        });
+    </script>
+</body>
+</html> 

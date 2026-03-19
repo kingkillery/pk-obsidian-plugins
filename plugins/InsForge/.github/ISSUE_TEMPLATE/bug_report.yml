@@ -1,0 +1,36 @@
+name: 🐛 Bug Report
+description: Report a bug to help us improve
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Fill out what you can - we'll figure out the rest together.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What's the bug?
+      description: Describe what went wrong
+      placeholder: Tell us what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-reproduce
+    attributes:
+      label: How to reproduce
+      description: Steps to trigger the bug (if you know them)
+      placeholder: |
+        1. Do this...
+        2. Then this...
+        3. Bug happens
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (optional)
+      description: What are you running? (OS, browser, version, etc.)
+      placeholder: e.g., macOS, Chrome, Docker, Node 20...
