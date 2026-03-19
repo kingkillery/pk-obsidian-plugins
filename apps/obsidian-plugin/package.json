@@ -1,0 +1,10 @@
+{
+  "name": "@apps/obsidian-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo plugin-dev",
+    "build": "echo plugin-build",
+    "test": "echo plugin-test"
+  }
+}

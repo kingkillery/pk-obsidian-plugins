@@ -1,0 +1,15 @@
+{
+  "name": "obsidian-multimodal-retrieval",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev:index-service": "pnpm --dir apps/index-service dev",
+    "dev:plugin": "pnpm --dir apps/obsidian-plugin dev",
+    "build": "pnpm -r build",
+    "discover:vaults": "node apps/index-service/src/server.js --discover-vaults",
+    "index:all-vaults": "node apps/index-service/src/server.js --index-all",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  }
+}

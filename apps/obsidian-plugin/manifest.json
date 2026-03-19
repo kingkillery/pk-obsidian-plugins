@@ -1,0 +1,9 @@
+{
+  "id": "pk-qmd-obsidian",
+  "name": "PK QMD Retrieval",
+  "version": "0.1.0",
+  "minAppVersion": "1.6.0",
+  "description": "Search and reindex local Obsidian vaults through the PK QMD sidecar service.",
+  "author": "pk",
+  "isDesktopOnly": true
+}

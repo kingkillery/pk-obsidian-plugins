@@ -1,0 +1,12 @@
+{
+  "name": "@apps/index-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "build": "node --check src/server.js",
+    "index:all": "node src/server.js --index-all",
+    "test": "node --check src/server.js"
+  }
+}
