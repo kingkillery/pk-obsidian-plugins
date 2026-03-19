@@ -13,6 +13,7 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const isEntrypoint = process.argv[1] && path.resolve(process.argv[1]) === __filename;
 const repoRoot = path.resolve(__dirname, "../../..");
 const port = Number(process.env.PORT || 4317);
 const scanRoot = path.resolve(process.env.OBSIDIAN_VAULT_SCAN_ROOT || repoRoot);
@@ -574,14 +575,49 @@ async function runCli() {
     return true;
   }
 
+  const searchFlagIndex = process.argv.indexOf("--search");
+  if (searchFlagIndex !== -1) {
+    const topKFlagIndex = process.argv.indexOf("--top-k");
+    const vaultFlagIndex = process.argv.indexOf("--vault");
+    const topK =
+      topKFlagIndex !== -1 && process.argv[topKFlagIndex + 1]
+        ? Number(process.argv[topKFlagIndex + 1])
+        : undefined;
+    const vaultPath =
+      vaultFlagIndex !== -1 && process.argv[vaultFlagIndex + 1]
+        ? process.argv[vaultFlagIndex + 1]
+        : undefined;
+    const consumedIndexes = new Set([
+      searchFlagIndex,
+      ...(topKFlagIndex !== -1 ? [topKFlagIndex, topKFlagIndex + 1] : []),
+      ...(vaultFlagIndex !== -1 ? [vaultFlagIndex, vaultFlagIndex + 1] : [])
+    ]);
+    const query = process.argv
+      .slice(searchFlagIndex + 1)
+      .filter((_value, index) => !consumedIndexes.has(index + searchFlagIndex + 1))
+      .join(" ")
+      .trim();
+
+    const result = await searchIndex({
+      query,
+      topK,
+      vaultPath
+    });
+    console.log(JSON.stringify({ ok: true, ...result }, null, 2));
+    return true;
+  }
+
   return false;
 }
 
-const handledByCli = await runCli();
-
-if (!handledByCli) {
+if (isEntrypoint) {
+  const handledByCli = await runCli();
+  if (!handledByCli) {
   const server = http.createServer(route);
   server.listen(port, () => {
     console.log(`index-service listening on http://localhost:${port}`);
   });
+  }
 }
+
+export { discoverVaults, indexAllVaults, route, scanRoot, searchIndex, statePath };

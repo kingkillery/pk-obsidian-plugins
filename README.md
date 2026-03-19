@@ -47,6 +47,24 @@ Index all discovered vaults:
 node apps/index-service/src/server.js --index-all
 ```
 
+CLI access through `pk-qmd`:
+
+```powershell
+node bin/pk-qmd.mjs discover
+node bin/pk-qmd.mjs index
+node bin/pk-qmd.mjs search "task management calendar pomodoro" --top-k 3
+node bin/pk-qmd.mjs serve --port 4317
+```
+
+If this package is linked or installed globally, the same commands are available as:
+
+```powershell
+pk-qmd discover
+pk-qmd index
+pk-qmd search "task management calendar pomodoro" --top-k 3
+pk-qmd serve --port 4317
+```
+
 Start the service:
 
 ```powershell
