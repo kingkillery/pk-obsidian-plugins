@@ -56,6 +56,14 @@ node bin/pk-qmd.mjs search "task management calendar pomodoro" --top-k 3
 node bin/pk-qmd.mjs serve --port 4317
 ```
 
+Windows repo-local wrapper:
+
+```powershell
+.\bin\pk-qmd.cmd discover
+.\bin\pk-qmd.cmd index
+.\bin\pk-qmd.cmd search "task management calendar pomodoro" --top-k 3
+```
+
 If this package is linked or installed globally, the same commands are available as:
 
 ```powershell
@@ -63,6 +71,19 @@ pk-qmd discover
 pk-qmd index
 pk-qmd search "task management calendar pomodoro" --top-k 3
 pk-qmd serve --port 4317
+```
+
+To make `pk-qmd` available as a normal command on this machine:
+
+```powershell
+npm link
+pk-qmd discover
+```
+
+To remove the global link later:
+
+```powershell
+npm unlink -g obsidian-multimodal-retrieval
 ```
 
 Start the service:
