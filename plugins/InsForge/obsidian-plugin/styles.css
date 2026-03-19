@@ -1,0 +1,91 @@
+.insforge-setting-note {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.insforge-view {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insforge-toolbar,
+.insforge-actions,
+.insforge-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.insforge-section {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insforge-section h3,
+.insforge-section h4 {
+  margin: 0;
+}
+
+.insforge-meta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.insforge-output,
+.insforge-textarea,
+.insforge-codearea,
+.insforge-input,
+.insforge-select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.insforge-output,
+.insforge-textarea,
+.insforge-codearea {
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  white-space: pre-wrap;
+  overflow: auto;
+}
+
+.insforge-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.insforge-codearea {
+  min-height: 220px;
+  resize: vertical;
+  font-family: var(--font-monospace);
+}
+
+.insforge-input,
+.insforge-select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.insforge-draft-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .insforge-draft-grid {
+    grid-template-columns: 1fr;
+  }
+}

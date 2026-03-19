@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+auth/node_modules/
+shared-schemas/node_modules/
+backend/node_modules/
+
+# Build outputs
+dist/
+frontend/dist/
+*.tsbuildinfo
+
+# Data and logs
+data/
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development files
+.git/
+.gitignore
+*.md
+docs/**
+!docs/agent-docs/**
+!docs/sdks/**
+!docs/snippets/**
+!docs/insforge-instructions-sdk.md
+tests/
+*.test.ts
+*.test.tsx
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Docker files (prevent recursion)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Development configs
+vitest.config.ts
+# tsconfig.json files are needed for build - DO NOT IGNORE
+# frontend/tsconfig.json is needed for @ alias resolution - DO NOT IGNORE
+# frontend/vite.config.ts is needed for build - DO NOT IGNORE
+.eslintrc.json
+frontend/.eslintrc.cjs
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Temporary files
+tmp/
+temp/
+*.tmp

@@ -1,0 +1,176 @@
+openapi: 3.0.3
+info:
+  title: Insforge Metadata API
+  version: 1.0.0
+
+paths:
+  /api/metadata:
+    get:
+      summary: Get app metadata
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Application metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  version:
+                    type: string
+                  environment:
+                    type: string
+                  database:
+                    type: object
+                    properties:
+                      host:
+                        type: string
+                      port:
+                        type: integer
+                      database:
+                        type: string
+                      ssl:
+                        type: boolean
+                  uptime:
+                    type: number
+                    description: Uptime in seconds
+                  timestamp:
+                    type: string
+                    format: date-time
+              example:
+                name: "Insforge Backend"
+                version: "2.0.0"
+                environment: "production"
+                database:
+                  host: "db.example.com"
+                  port: 5432
+                  database: "insforge"
+                  ssl: true
+                uptime: 86400
+                timestamp: "2024-01-21T10:30:00Z"
+
+  /api/metadata/database:
+    get:
+      summary: Get database metadata
+      description: Get database statistics and table information for dashboard
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Database metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tables:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        recordCount:
+                          type: integer
+                  totalTables:
+                    type: integer
+                  totalRecords:
+                    type: integer
+                  databaseSize:
+                    type: string
+                  lastUpdated:
+                    type: string
+                    format: date-time
+              example:
+                tables:
+                  - name: "posts"
+                    recordCount: 5678
+                  - name: "comments"
+                    recordCount: 9012
+                totalTables: 15
+                totalRecords: 16924
+                databaseSize: "125 MB"
+                lastUpdated: "2024-01-21T10:30:00Z"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "UNAUTHORIZED"
+                message: "Invalid or missing authentication"
+                statusCode: 401
+                nextAction: "Please provide valid authentication credentials"
+
+  /api/metadata/api-key:
+    get:
+      summary: Get API key
+      description: Admin-only endpoint to retrieve the API key
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apiKey:
+                    type: string
+              example:
+                apiKey: "ins_1234567890abcdef1234567890abcdef"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INSUFFICIENT_PERMISSIONS"
+                message: "Only admin users can access API keys"
+                statusCode: 403
+                nextAction: "Contact an administrator for API key access"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code for programmatic handling
+        message:
+          type: string
+          description: Human-readable error message
+        statusCode:
+          type: integer
+          description: HTTP status code
+        nextAction:
+          type: string
+          description: Suggested action to resolve the error

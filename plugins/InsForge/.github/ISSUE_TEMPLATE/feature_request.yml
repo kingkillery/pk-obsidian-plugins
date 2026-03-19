@@ -1,0 +1,26 @@
+name: ✨ Feature Request
+description: Suggest an idea or enhancement
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea? Share it! We'd love to hear what you're thinking.
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: What feature do you want?
+      description: Describe your idea
+      placeholder: I'd like to be able to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why do you need this?
+      description: What problem does it solve?
+      placeholder: This would help me...
