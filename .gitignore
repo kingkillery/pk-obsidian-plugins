@@ -4,6 +4,10 @@ plugins/**/.obsidian/
 /plugins/obsidian-terminal/.obsidian/
 /plugins/tasknotes/tasknotes-e2e-vault/.obsidian/
 node_modules/
+.env
+*.env
+**/.env
+**/*.env
 **/data.json
 /plugins/obsidian-codex-app/obsidian-codex-scaffold/
 /plugins/obsidian-codex-app/backend/*.exe
