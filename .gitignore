@@ -12,3 +12,5 @@ node_modules/
 /plugins/obsidian-codex-app/obsidian-codex-scaffold/
 /plugins/obsidian-codex-app/backend/*.exe
 /plugins/obsidian-codex-app/bin/*.exe
+.planning/
+plugins/**/.ralph/

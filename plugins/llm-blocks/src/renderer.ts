@@ -173,7 +173,7 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 			}
 
 			const selectedRuntime = this.getSelectedRuntime();
-			const promptWithContext = this.contextManager.buildPromptWithContext(trimmedPrompt);
+			const promptWithContext = await this.contextManager.buildPromptWithContext(trimmedPrompt);
 			const queryOptions: QueryOptions = {
 				...buildQueryOptionsFromRuntimeOption(selectedRuntime),
 			};
@@ -235,7 +235,9 @@ export class LLMBlockRenderer extends MarkdownRenderChild {
 	private syncContextHint(): void {
 		if (!this.contextHintEl) return;
 		const summary = this.contextManager.getAttachedContextSummary();
-		this.contextHintEl.textContent = summary ? `Context: ${summary}` : "Context: prompt only";
+		const retrieved = this.contextManager.getLastVaultAttachmentSummary();
+		const parts = [summary, retrieved].filter((part) => !!part);
+		this.contextHintEl.textContent = parts.length > 0 ? `Context: ${parts.join(" | ")}` : "Context: prompt only";
 	}
 
 	private getRuntimeCacheVariant(): string {

@@ -293,9 +293,9 @@ export class LLMCanvasModal extends Modal {
 		return true;
 	}
 
-	private buildPrompt(instruction: string, currentMarkdown: string): string {
+	private async buildPrompt(instruction: string, currentMarkdown: string): Promise<string> {
 		return [
-			this.contextManager.buildPromptWithContext(instruction.trim()),
+			await this.contextManager.buildPromptWithContext(instruction.trim()),
 			"",
 			"Rewrite the markdown below. Return only the replacement markdown with no explanation.",
 			"",
@@ -335,7 +335,7 @@ export class LLMCanvasModal extends Modal {
 
 		const selectedRuntime = this.getSelectedRuntime();
 		const runtimeQueryOptions = buildQueryOptionsFromRuntimeOption(selectedRuntime);
-		const prompt = this.buildPrompt(instruction, context.source);
+		const prompt = await this.buildPrompt(instruction, context.source);
 		const onDelta = (delta: string) => {
 			this.output += delta;
 			this.outputRaw.value = this.output;

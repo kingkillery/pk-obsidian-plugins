@@ -222,6 +222,34 @@ export class LLMBlocksSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl)
+			.setName("Enable vault search context")
+			.setDesc("Lexically search markdown notes in the vault and attach top matches to prompts.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableVaultSearchContext)
+					.onChange(async (value) => {
+						this.plugin.settings.enableVaultSearchContext = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Vault search result limit")
+			.setDesc("How many matching notes to attach when vault search context is enabled.")
+			.addText((text) =>
+				text
+					.setPlaceholder("3")
+					.setValue(String(this.plugin.settings.vaultSearchResultLimit))
+					.onChange(async (value) => {
+						const parsed = Number(value);
+						if (Number.isFinite(parsed) && parsed > 0) {
+							this.plugin.settings.vaultSearchResultLimit = Math.floor(parsed);
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
 		containerEl.createEl("h3", { text: "Cache" });
 		new Setting(containerEl)
 			.setName("Clear response cache")

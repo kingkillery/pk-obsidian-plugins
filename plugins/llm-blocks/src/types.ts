@@ -31,6 +31,8 @@ export interface LLMBlocksSettings {
 	autoAttachSelectionContext: boolean;
 	attachActiveNoteContext: boolean;
 	maxContextChars: number;
+	enableVaultSearchContext: boolean;
+	vaultSearchResultLimit: number;
 }
 
 export const DEFAULT_SETTINGS: LLMBlocksSettings = {
@@ -51,6 +53,8 @@ export const DEFAULT_SETTINGS: LLMBlocksSettings = {
 	autoAttachSelectionContext: true,
 	attachActiveNoteContext: false,
 	maxContextChars: 6000,
+	enableVaultSearchContext: false,
+	vaultSearchResultLimit: 3,
 };
 
 export type AuthState = "unchecked" | "authenticated" | "unauthenticated";

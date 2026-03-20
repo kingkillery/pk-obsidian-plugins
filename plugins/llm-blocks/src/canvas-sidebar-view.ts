@@ -219,15 +219,19 @@ export class LLMCanvasSidebarView extends ItemView {
 			this.bindingStateBadge.classList.add("llm-binding-active");
 			this.bindingStateBadge.classList.remove("llm-binding-stale");
 			const attached = this.contextManager.getAttachedContextSummary();
+			const retrieved = this.contextManager.getLastVaultAttachmentSummary();
 			const base = `Editing: ${this.boundFileName || "Current note"} | ${this.scope}`;
-			this.contextHint.setText(attached ? `${base} | ${attached}` : base);
+			const detail = [attached, retrieved].filter((part) => !!part).join(" | ");
+			this.contextHint.setText(detail ? `${base} | ${detail}` : base);
 		} else {
 			this.bindingStateBadge.setText("Binding: stale (note changed)");
 			this.bindingStateBadge.classList.add("llm-binding-stale");
 			this.bindingStateBadge.classList.remove("llm-binding-active");
 			const attached = this.contextManager.getAttachedContextSummary();
+			const retrieved = this.contextManager.getLastVaultAttachmentSummary();
 			const base = "Active editor no longer matches bound note. Click Use Current Note to retarget.";
-			this.contextHint.setText(attached ? `${base} ${attached}` : base);
+			const detail = [attached, retrieved].filter((part) => !!part).join(" | ");
+			this.contextHint.setText(detail ? `${base} ${detail}` : base);
 		}
 	}
 
@@ -272,7 +276,7 @@ export class LLMCanvasSidebarView extends ItemView {
 		const current = editor.getValue().slice(this.targetStartOffset, this.targetEndOffset);
 		const selectedRuntime = this.getSelectedRuntime();
 		const prompt = [
-			this.contextManager.buildPromptWithContext(instruction),
+			await this.contextManager.buildPromptWithContext(instruction),
 			"",
 			"Rewrite the markdown below. Return only the replacement markdown with no explanation.",
 			"",

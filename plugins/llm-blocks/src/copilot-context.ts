@@ -1,5 +1,6 @@
 import { App, MarkdownView } from "obsidian";
 import type { LLMBlocksSettings } from "./types";
+import { VaultSearchService } from "./vault-search";
 
 interface ActiveNoteSnapshot {
 	noteTitle: string;
@@ -18,18 +19,21 @@ export interface SelectionSnapshot {
 
 type ContextSettings = Pick<
 	LLMBlocksSettings,
-	"autoAttachSelectionContext" | "attachActiveNoteContext" | "maxContextChars"
+	"autoAttachSelectionContext" | "attachActiveNoteContext" | "maxContextChars" | "enableVaultSearchContext" | "vaultSearchResultLimit"
 >;
 
 export class CopilotContextManager {
 	private selectionSnapshot: SelectionSnapshot | null = null;
 	private selectionDebounceTimer: number | null = null;
 	private readonly selectionHandler: () => void;
+	private readonly vaultSearch: VaultSearchService;
+	private lastVaultAttachments: string[] = [];
 
 	constructor(
 		private readonly app: App,
 		private readonly getSettings: () => ContextSettings,
 	) {
+		this.vaultSearch = new VaultSearchService(app);
 		this.selectionHandler = () => {
 			if (this.selectionDebounceTimer !== null) {
 				window.clearTimeout(this.selectionDebounceTimer);
@@ -66,7 +70,15 @@ export class CopilotContextManager {
 			const active = this.getActiveNoteSnapshot();
 			if (active) parts.push(`Note: ${active.noteTitle}`);
 		}
+		if (settings.enableVaultSearchContext) {
+			parts.push(`Vault search: top ${settings.vaultSearchResultLimit}`);
+		}
 		return parts.join(" | ");
+	}
+
+	getLastVaultAttachmentSummary(): string {
+		if (this.lastVaultAttachments.length === 0) return "";
+		return `Retrieved: ${this.lastVaultAttachments.join(", ")}`;
 	}
 
 	getCacheVariant(): string {
@@ -84,18 +96,25 @@ export class CopilotContextManager {
 			settings.attachActiveNoteContext
 				? JSON.stringify(this.getActiveNoteSnapshot() ?? null)
 				: "";
+		const vaultPart = JSON.stringify({
+			enableVaultSearchContext: settings.enableVaultSearchContext,
+			vaultSearchResultLimit: settings.vaultSearchResultLimit,
+			lastVaultAttachments: this.lastVaultAttachments,
+		});
 		return JSON.stringify({
 			autoAttachSelectionContext: settings.autoAttachSelectionContext,
 			attachActiveNoteContext: settings.attachActiveNoteContext,
 			maxContextChars: settings.maxContextChars,
+			vaultPart,
 			selectionPart,
 			activePart,
 		});
 	}
 
-	buildPromptWithContext(userPrompt: string): string {
+	async buildPromptWithContext(userPrompt: string): Promise<string> {
 		const trimmedPrompt = userPrompt.trim();
 		if (!trimmedPrompt) return "";
+		this.lastVaultAttachments = [];
 
 		const settings = this.getSettings();
 		const sections: string[] = [];
@@ -126,6 +145,29 @@ export class CopilotContextManager {
 						"",
 						"```md",
 						this.clipToBudget(active.content),
+						"```",
+					].join("\n"),
+				);
+			}
+		}
+
+		if (settings.enableVaultSearchContext) {
+			const searchResults = await this.vaultSearch.search(
+				trimmedPrompt,
+				settings.vaultSearchResultLimit,
+				Math.max(300, Math.floor(settings.maxContextChars / Math.max(1, settings.vaultSearchResultLimit))),
+			);
+			for (const result of searchResults) {
+				this.lastVaultAttachments.push(result.file.basename);
+				sections.push(
+					[
+						"Attached vault note context:",
+						`- Note: ${result.file.basename}`,
+						`- Path: ${result.file.path}`,
+						`- Score: ${result.score}`,
+						"",
+						"```md",
+						result.excerpt,
 						"```",
 					].join("\n"),
 				);
